@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   ImageBackground,
+  Platform,
+  NativeModules,
+  Alert,
 } from 'react-native';
 import { sendOTP, verifyOTP } from '../api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +19,57 @@ const LoginScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (step === 'PHONE' && Platform.OS === 'android') {
+      const timer = setTimeout(() => {
+        if (!phoneNumber) {
+          handleRequestPhoneNumberHint();
+        }
+      }, 600);
+
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  // ✅ FIXED FUNCTION (no duplicate, safe)
+  const handleRequestPhoneNumberHint = async () => {
+    try {
+      const { PhoneNumberHint } = NativeModules;
+
+      if (!PhoneNumberHint || !PhoneNumberHint.requestHint) {
+        console.log('PhoneNumberHint module not available');
+        return;
+      }
+
+      const phoneString: string = await PhoneNumberHint.requestHint();
+
+      if (!phoneString) return;
+
+      const cleanNumber = phoneString
+        .replace(/^\+?91/, '')
+        .replace(/[^0-9]/g, '');
+
+      setPhoneNumber(cleanNumber);
+    } catch (error: unknown) {
+      console.log('Phone number hint error:', error);
+
+      // Ignore cancel
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as any).code === 'HINT_CANCELLED'
+      ) {
+        return;
+      }
+
+      Alert.alert(
+        'Hint Error',
+        'Could not load phone number automatically.'
+      );
+    }
+  };
 
   const handleSendOtp = async () => {
     if (phoneNumber.length < 10) {
@@ -83,12 +137,15 @@ const LoginScreen = () => {
                   style={styles.input}
                   placeholder="9876543210"
                   placeholderTextColor="#999"
-                  keyboardType="numeric"
+                  keyboardType="phone-pad"
                   maxLength={10}
                   value={phoneNumber}
                   onChangeText={(text) =>
                     setPhoneNumber(text.replace(/[^0-9]/g, ''))
                   }
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  importantForAutofill="yes"
                 />
               </View>
 
@@ -106,7 +163,6 @@ const LoginScreen = () => {
             </>
           ) : (
             <>
-              {/* Back */}
               <TouchableOpacity
                 onPress={() => setStep('PHONE')}
                 style={styles.backRow}
@@ -117,10 +173,9 @@ const LoginScreen = () => {
               <Text style={styles.title}>Verify account</Text>
 
               <Text style={styles.subtitle}>
-                Enter the 6-digit code sent to +91 {phoneNumber} via WhatsApp
+                Enter the 6-digit code sent to +91 {phoneNumber}
               </Text>
 
-              {/* OTP BOX */}
               <View style={styles.otpContainer}>
                 {[...Array(6)].map((_, index) => (
                   <View
@@ -131,7 +186,7 @@ const LoginScreen = () => {
                     ]}
                   >
                     <Text style={styles.otpText}>
-                    {otp[index] || ''}
+                      {otp[index] || ''}
                     </Text>
                   </View>
                 ))}
