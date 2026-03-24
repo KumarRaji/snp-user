@@ -14,7 +14,7 @@ import {
 import { sendOTP, verifyOTP } from '../api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const LoginScreen = () => {
+const LoginScreen = ({ navigation }: any) => {
   const [step, setStep] = useState<'PHONE' | 'OTP'>('PHONE');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -102,7 +102,8 @@ const LoginScreen = () => {
 
       if (res.success) {
         await AsyncStorage.setItem('token', res.token);
-        alert('Login success');
+        // Ensure this string exactly matches the <Stack.Screen name="..."> in your router
+        navigation.replace('HomeScreen');
       }
     } catch (error) {
       console.log(error);
