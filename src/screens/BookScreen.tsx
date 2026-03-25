@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,10 +40,15 @@ const BookScreen = () => {
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showChargesModal, setShowChargesModal] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const fromRef = useRef<any>(null);
   const toRef = useRef<any>(null);
+
+  const [estimate, setEstimate] = useState<number | null>(null);
+  const [pricing, setPricing] = useState<any>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
 
   // ✅ FIXED LOGIC
   const showDropLocation =
@@ -68,6 +73,50 @@ const BookScreen = () => {
     fromRef.current?.setAddressText('');
     toRef.current?.setAddressText('');
   };
+
+  const fetchEstimate = async () => {
+    try {
+      setEstimateLoading(true);
+  
+      const hours = parseInt(duration); // "4 Hrs" -> 4
+      const packageType = serviceType === 'OUTSTATION' ? 'OUTSTATION' : 'LOCAL';
+  
+      let url = `https://drivemate.api.luisant.cloud/api/pricing-packages/estimate?packageType=${packageType}&hours=${hours}`;
+      
+      if (packageType === 'OUTSTATION') {
+        url += '&distance=100'; // Default distance for outstation estimate
+      }
+
+      const res = await fetch(url);
+  
+      const data = await res.json();
+  
+      let finalEstimate = data.estimate;
+      let finalPricing = data.pricing;
+
+      // Fallbacks if API is missing data (especially for LOCAL)
+      if (!finalEstimate && packageType === 'LOCAL') {
+        finalEstimate = hours === 4 ? 500 : (hours * 125);
+      }
+      if (!finalPricing) {
+        finalPricing = {
+          description: `${hours} Hrs ${packageType === 'LOCAL' ? 'Local' : 'Outstation'} Package`,
+          extraPerHour: 100
+        };
+      }
+
+      setEstimate(finalEstimate);
+      setPricing(finalPricing);
+    } catch (e) {
+      console.log('Estimate error', e);
+    } finally {
+      setEstimateLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEstimate();
+  }, [duration, serviceType]);
 
   const handleBook = async () => {
     if (!from || (showDropLocation && !to)) {
@@ -210,6 +259,11 @@ const BookScreen = () => {
       start.setMinutes(start.getMinutes() + 30);
     }
     return slots;
+  };
+
+  const getUsageOptions = () => {
+    const maxHours = serviceType === 'OUTSTATION' ? 30 : 12;
+    return Array.from({ length: maxHours - 3 }, (_, i) => `${i + 4} Hrs`);
   };
 
   const renderDropdown = (
@@ -381,7 +435,7 @@ const BookScreen = () => {
             ) : (
               renderDropdown('When do you need?', whenNeeded, ['Immediately','Schedule'], 'when', setWhenNeeded)
             )}
-            {renderDropdown('Estimated Usage', duration, ['4 Hrs','8 Hrs'], 'duration', setDuration)}
+            {renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
 
             {/* DATE */}
             <View style={{ marginBottom: 15 }}>
@@ -409,8 +463,35 @@ const BookScreen = () => {
 
             {/* FARE */}
             <View style={styles.fareCard}>
-              <Text>Estimated fare</Text>
-              <Text style={styles.price}>₹500</Text>
+              <Text style={styles.fareTitle}>Estimated fare</Text>
+            
+              {estimateLoading ? (
+                <ActivityIndicator />
+              ) : (
+                <>
+                  <Text style={styles.price}>₹{estimate || 0}</Text>
+            
+                  {pricing && (
+                    <>
+                      <Text style={styles.packageText}>
+                        {pricing.description}
+                      </Text>
+            
+                      <View style={styles.divider} />
+            
+                      <Text style={styles.extraText}>
+                        EXTRA PER HOUR: ₹{pricing.extraPerHour}
+                      </Text>
+            
+                      <TouchableOpacity onPress={() => setShowChargesModal(true)}>
+                        <Text style={styles.moreText}>
+                          ℹ More charges apply
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
+              )}
             </View>
 
             {/* TERMS */}
@@ -453,6 +534,26 @@ const BookScreen = () => {
         isOpen={showTerms}
         onClose={() => setShowTerms(false)}
       />
+
+      {showChargesModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            
+            {/* HEADER */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Additional Charges</Text>
+              <TouchableOpacity onPress={() => setShowChargesModal(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* CONTENT */}
+            <Text style={styles.modalText}>
+              • Extra Pay for One Way Drop Return Ticket
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -510,6 +611,12 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
 
+  fareTitle: { fontSize: 14, color: '#666', marginBottom: 5 },
+  packageText: { fontSize: 12, color: '#555', marginTop: 5 },
+  divider: { height: 1, backgroundColor: '#cceae3', marginVertical: 10 },
+  extraText: { fontSize: 12, fontWeight: 'bold', color: '#333', marginBottom: 5 },
+  moreText: { fontSize: 12, color: '#0066cc', marginTop: 5 },
+
   price: { fontSize: 24, fontWeight: 'bold' },
 
   checkboxRow: {
@@ -562,5 +669,30 @@ const styles = StyleSheet.create({
     color: '#0066cc',
     marginBottom: 10,
     fontWeight: 'bold'
-  }
+  },
+
+  modalOverlay: {
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    elevation: 1000
+  },
+  modalBox: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15
+  },
+  modalTitle: { fontSize: 16, fontWeight: 'bold' },
+  closeBtn: { fontSize: 20, color: '#999', paddingHorizontal: 5 },
+  modalText: { fontSize: 14, color: '#444', lineHeight: 22 }
 });
