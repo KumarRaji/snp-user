@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -8,18 +8,30 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { updateProfile } from '../api/authApi';
 import { uploadFile } from '../api/uploadApi';
 
-const CompleteProfileModal = ({ visible, onClose, onComplete }: any) => {
+const CompleteProfileModal = ({ visible, onClose, onComplete, profile }: any) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [fileId, setFileId] = useState('');
   const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Prefill the form if user already has partial profile data saved
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setEmail(profile.email || '');
+      setAddress(profile.address || '');
+      setFileId(profile.idProof || '');
+    }
+  }, [profile]);
 
   // 📁 Pick + Upload file
   const handlePickFile = async () => {
@@ -45,6 +57,50 @@ const CompleteProfileModal = ({ visible, onClose, onComplete }: any) => {
     }
   };
 
+  // 📷 Take Photo using Camera
+  const handleTakePhoto = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const file = {
+        uri: asset.uri,
+        name: asset.fileName || asset.uri.split('/').pop() || 'camera_image.jpg',
+        mimeType: asset.mimeType || 'image/jpeg',
+        size: asset.fileSize,
+      };
+
+      try {
+        setLoading(true);
+        const res = await uploadFile(file);
+        setFileId(res.fileId || res.url || '');
+        setFileName(file.name);
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
+        Alert.alert('Error', 'File upload failed');
+      }
+    }
+  };
+
+  const handleUploadChoice = () => {
+    Alert.alert('Upload ID Proof', 'Choose an option', [
+      { text: 'Take Photo', onPress: handleTakePhoto },
+      { text: 'Choose from Gallery', onPress: handlePickFile },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const handleSubmit = async () => {
     if (!name || !email || !address) {
       Alert.alert('Required', 'Please fill all details');
@@ -53,18 +109,25 @@ const CompleteProfileModal = ({ visible, onClose, onComplete }: any) => {
 
     setLoading(true);
 
-    const res = await updateProfile({
+    const payload: any = {
       name,
       email,
       address,
-      idProof: fileId, // ✅ IMPORTANT
-    });
+    };
+
+    if (fileId) {
+      payload.idProof = fileId;
+    }
+
+    const res = await updateProfile(payload);
 
     setLoading(false);
 
     if (res.success) {
       onComplete();
       onClose();
+    } else {
+      Alert.alert('Error', res.message || 'Failed to save profile');
     }
   };
 
@@ -101,9 +164,13 @@ const CompleteProfileModal = ({ visible, onClose, onComplete }: any) => {
           {/* ✅ ID PROOF SECTION */}
           <Text style={styles.label}>ID Proof</Text>
 
-          <TouchableOpacity style={styles.uploadBtn} onPress={handlePickFile}>
+          {fileId ? (
+            <Image source={{ uri: fileId }} style={styles.idProofImage} resizeMode="contain" />
+          ) : null}
+
+          <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadChoice}>
             <Text style={styles.uploadText}>
-              {fileName ? fileName : 'Choose File'}
+              {fileName ? fileName : (fileId ? 'Replace Uploaded File' : 'Choose File')}
             </Text>
           </TouchableOpacity>
 
@@ -174,6 +241,14 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: 'bold',
     marginBottom: 5,
+  },
+
+  idProofImage: {
+    width: '100%',
+    height: 150,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
   },
 
   uploadBtn: {

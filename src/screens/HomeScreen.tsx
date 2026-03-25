@@ -17,9 +17,12 @@ const HomeScreen = ({ navigation }: any) => {
 
   const loadProfile = async () => {
     const data = await getProfile();
-    setProfile(data);
+    
+    // Safely extract the user object depending on how your API nests it
+    const userData = data?.user || data?.data || data;
+    setProfile(userData);
 
-    if (data && (!data.email || !data.address || !data.idProof)) {
+    if (userData && (!userData.email || !userData.address)) {
       setShowModal(true);
     }
   };
@@ -51,6 +54,7 @@ const HomeScreen = ({ navigation }: any) => {
         visible={showModal} 
         onClose={() => setShowModal(false)}
         onComplete={loadProfile}
+        profile={profile}
       />
     </SafeAreaView>
   );
