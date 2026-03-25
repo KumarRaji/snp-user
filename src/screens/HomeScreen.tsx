@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import BookScreen from './BookScreen';
 import TripsScreen from './TripsScreen';
 import ProfileScreen from './ProfileScreen';
@@ -11,6 +12,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [tab, setTab] = useState<'BOOK' | 'TRIPS' | 'PROFILE'>('BOOK');
   const [profile, setProfile] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -28,10 +30,36 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('token');
+    navigation.replace('Login');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>SNP</Text>
+        {/* TOP ROW: PROFILE & LOGOUT */}
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>SNP</Text>
+
+          <View style={{ zIndex: 100, elevation: 10 }}>
+            <TouchableOpacity style={styles.profileSection} onPress={() => setShowLogoutMenu(!showLogoutMenu)}>
+              <Text style={styles.greetingText}>{profile?.name || 'User'}</Text>
+              <View style={styles.avatarMini}>
+                <Text style={styles.avatarMiniText}>{profile?.name?.[0]?.toUpperCase() || 'U'}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {showLogoutMenu && (
+              <TouchableOpacity style={styles.logoutMenu} onPress={handleLogout}>
+                <Text style={styles.logoutText}>Logout</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.content}>
         <View style={styles.topTabBar}>
           <TouchableOpacity style={[styles.tab, tab === 'BOOK' && styles.activeTab]} onPress={() => setTab('BOOK')}>
             <Text style={[styles.tabText, tab === 'BOOK' && styles.activeTabText]}>Book</Text>
@@ -43,9 +71,7 @@ const HomeScreen = ({ navigation }: any) => {
             <Text style={[styles.tabText, tab === 'PROFILE' && styles.activeTabText]}>Profile</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      <View style={styles.content}>
         {tab === 'BOOK' && <BookScreen />}
         {tab === 'TRIPS' && <TripsScreen />}
         {tab === 'PROFILE' && <ProfileScreen profile={profile} navigation={navigation} />}
@@ -65,17 +91,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { 
     paddingTop: Platform.OS === 'android' ? 45 : 16, 
-    paddingHorizontal: 16, 
-    paddingBottom: 16, 
     backgroundColor: '#fff', 
     borderBottomWidth: 1, 
-    borderBottomColor: '#eee', 
+    borderBottomColor: '#eee',
+    zIndex: 100,
+    elevation: 10,
+  },
+  headerTop: {
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    zIndex: 100,
+    elevation: 10,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  topTabBar: { flexDirection: 'row', gap: 8 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
+  profileSection: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarMini: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  avatarMiniText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  greetingText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  logoutMenu: {
+    position: 'absolute',
+    top: 50,
+    right: -5,
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    zIndex: 1000,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  logoutText: { color: 'red', fontWeight: 'bold', fontSize: 14 },
+  topTabBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 15 },
   content: { flex: 1 },
   tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f5f5f5' },
   activeTab: { backgroundColor: '#000' },

@@ -9,7 +9,6 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -42,11 +41,6 @@ const ProfileScreen = ({ profile, navigation }: any) => {
       });
     }
   }, [profile]);
-
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
-    navigation.replace('Login');
-  };
 
   // 📁 Upload ID Proof
   const handlePickFile = async () => {
@@ -242,10 +236,6 @@ const ProfileScreen = ({ profile, navigation }: any) => {
           >
             <Text style={styles.editText}>Edit Profile</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
         </>
       ) : (
         <View style={styles.row}>
@@ -357,18 +347,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-
-  logoutBtn: {
-    marginTop: 10,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'red',
-    borderRadius: 10,
-    width: '100%',
-    alignItems: 'center',
-  },
-
-  logoutText: { color: 'red', fontWeight: 'bold' },
 
   row: {
     flexDirection: 'row',
