@@ -112,6 +112,9 @@ const LoginScreen = ({ navigation }: any) => {
     setLoading(false);
   };
 
+  const isPhoneValid = phoneNumber.length === 10;
+  const isOtpValid = otp.length === 6;
+
   return (
     <ImageBackground
       source={{
@@ -151,9 +154,9 @@ const LoginScreen = ({ navigation }: any) => {
               </View>
 
               <TouchableOpacity
-                style={styles.button}
+                style={[styles.button, (!isPhoneValid || loading) && styles.disabledButton]}
                 onPress={handleSendOtp}
-                disabled={loading}
+                disabled={!isPhoneValid || loading}
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
@@ -205,9 +208,9 @@ const LoginScreen = ({ navigation }: any) => {
               </View>
 
               <TouchableOpacity
-                style={styles.button}
+                style={[styles.button, (!isOtpValid || loading) && styles.disabledButton]}
                 onPress={handleVerifyOtp}
-                disabled={loading}
+                disabled={!isOtpValid || loading}
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
@@ -287,6 +290,10 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
+  },
+
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
 
   btnText: {

@@ -1,22 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  FlatList,
   Alert,
   ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import * as Location from 'expo-location';
 import { createTrip } from '../api/tripApi';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import TermsAndConditionsModal from './TermsAndConditionsModal';
 
 const BookScreen = () => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  
-  // Main Selections
+
   const [serviceType, setServiceType] = useState('LOCAL_HOURLY');
   const [tripType, setTripType] = useState('One Way');
   const [driverType, setDriverType] = useState('ACTING');
@@ -24,19 +27,22 @@ const BookScreen = () => {
   const [duration, setDuration] = useState('4 Hrs');
   const [carType, setCarType] = useState('Manual');
   const [vehicleType, setVehicleType] = useState('Hatchback');
-  
-  // UI State
+
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
-  // Options
+  const fromRef = useRef<any>(null);
+
+  const showDropLocation = !(serviceType === 'LOCAL_HOURLY' || tripType === 'Round Trip');
+  const isFormValid = from.trim() !== '' && (!showDropLocation || to.trim() !== '') && agree;
+
   const SERVICE_OPTIONS = ['ACTING', 'SPARE', 'TEMPORARY', 'VALET', 'DAILY', 'WEEKLY', 'MONTHLY'];
   const USAGE_OPTIONS = ['4 Hrs', '5 Hrs', '6 Hrs', '7 Hrs', '8 Hrs', '9 Hrs', '10 Hrs', '11 Hrs', '12 Hrs'];
 
   const handleBook = async () => {
-    if (!from || !to) {
+    if (!from || (showDropLocation && !to)) {
       Alert.alert('Required', 'Enter locations');
       return;
     }
@@ -50,7 +56,7 @@ const BookScreen = () => {
 
     const res = await createTrip({
       pickupLocation: from,
-      dropLocation: to,
+      dropLocation: showDropLocation ? to : '',
       serviceType,
       tripType,
       driverType,
@@ -70,18 +76,64 @@ const BookScreen = () => {
     }
   };
 
-  // Helper to render accordion dropdowns
-  const renderDropdown = (label: string, value: string, options: string[], dropdownKey: string, onSelect: (val: string) => void) => (
+  const fetchMyLocation = async () => {
+    try {
+      setLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please allow location access.');
+        setLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const [addressDetails] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (addressDetails) {
+        const addressParts = [
+          addressDetails.name,
+          addressDetails.street,
+          addressDetails.city,
+          addressDetails.region,
+        ].filter(Boolean);
+
+        const formattedAddress = addressParts.join(', ');
+        
+        setFrom(formattedAddress);
+        // Programmatically update the text in the Google Places input
+        fromRef.current?.setAddressText(formattedAddress);
+      }
+    } catch (error) {
+      console.log('Location error:', error);
+      Alert.alert('Error', 'Failed to fetch location.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderDropdown = (
+    label: string,
+    value: string,
+    options: string[],
+    dropdownKey: string,
+    onSelect: (val: string) => void
+  ) => (
     <View style={{ marginBottom: 15 }}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+
       <TouchableOpacity
         style={styles.dropdownBox}
-        onPress={() => setOpenDropdown(openDropdown === dropdownKey ? null : dropdownKey)}
+        onPress={() =>
+          setOpenDropdown(openDropdown === dropdownKey ? null : dropdownKey)
+        }
       >
         <Text style={styles.dropdownBoxText}>{value}</Text>
-        <Text style={styles.dropdownIcon}>{openDropdown === dropdownKey ? '▲' : '▼'}</Text>
+        <Text>{openDropdown === dropdownKey ? '▲' : '▼'}</Text>
       </TouchableOpacity>
-      
+
       {openDropdown === dropdownKey && (
         <View style={styles.dropdownList}>
           {options.map((opt) => (
@@ -93,7 +145,15 @@ const BookScreen = () => {
                 setOpenDropdown(null);
               }}
             >
-              <Text style={value === opt ? styles.dropdownItemTextSelected : styles.dropdownItemText}>{opt}</Text>
+              <Text
+                style={
+                  value === opt
+                    ? styles.dropdownItemTextSelected
+                    : styles.dropdownItemText
+                }
+              >
+                {opt}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -102,158 +162,157 @@ const BookScreen = () => {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <SafeAreaView style={{ flex: 1 }}>
+      <FlatList
+        style={{ flex: 1 }}
+        data={[]}
+        renderItem={() => null}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: 40 }
+        ]}
+        ListHeaderComponent={
+          <>
+            {/* SERVICE TYPE */}
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[
+                  styles.tab,
+                  serviceType === 'LOCAL_HOURLY' && styles.activeTab
+                ]}
+                onPress={() => setServiceType('LOCAL_HOURLY')}
+              >
+                <Text style={styles.tabText}>Local</Text>
+              </TouchableOpacity>
 
-      {/* LOCAL / OUTSTATION */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.tab, serviceType === 'LOCAL_HOURLY' && styles.activeTab]}
-          onPress={() => setServiceType('LOCAL_HOURLY')}
+              <TouchableOpacity
+                style={[
+                  styles.tab,
+                  serviceType === 'OUTSTATION' && styles.activeTab
+                ]}
+                onPress={() => setServiceType('OUTSTATION')}
+              >
+                <Text style={styles.tabText}>Outstation</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* TRIP TYPE */}
+            {serviceType !== 'OUTSTATION' && (
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    tripType === 'One Way' && styles.activeTab
+                  ]}
+                  onPress={() => setTripType('One Way')}
+                >
+                  <Text style={styles.tabText}>One Way</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    tripType === 'Round Trip' && styles.activeTab
+                  ]}
+                  onPress={() => setTripType('Round Trip')}
+                >
+                  <Text style={styles.tabText}>Round Trip</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* LOCATION */}
+            <View style={{ zIndex: 2 }}>
+              <GooglePlacesAutocomplete
+                ref={fromRef}
+                placeholder="Pickup Location"
+                fetchDetails={true}
+                onPress={(data) => setFrom(data.description)}
+                query={{ key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8', language: 'en' }}
+                styles={{
+                  textInput: [styles.input, { marginBottom: 0 }],
+                  container: { flex: 0, marginBottom: 5 },
+                  listView: { backgroundColor: '#fff', elevation: 3, borderRadius: 8, position: 'absolute', top: 55, zIndex: 10, width: '100%' }
+                }}
+              />
+              <TouchableOpacity onPress={fetchMyLocation} style={styles.locationBtn}>
+                <Text style={styles.locationBtnText}>📍 Use My Current Location</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDropLocation && (
+              <View style={{ zIndex: 1 }}>
+                <GooglePlacesAutocomplete
+                  placeholder="Drop Location"
+                  fetchDetails={true}
+                  onPress={(data) => setTo(data.description)}
+                  query={{ key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8', language: 'en' }}
+                  styles={{
+                    textInput: [styles.input, { marginBottom: 0 }],
+                    container: { flex: 0, marginBottom: 15 },
+                    listView: { backgroundColor: '#fff', elevation: 3, borderRadius: 8, position: 'absolute', top: 55, zIndex: 10, width: '100%' }
+                  }}
+                />
+              </View>
+            )}
+
+            {/* DROPDOWNS */}
+            {renderDropdown('Choose Service', driverType, SERVICE_OPTIONS, 'driver', setDriverType)}
+            {renderDropdown('When do you need?', whenNeeded, ['Immediately', 'Schedule'], 'when', setWhenNeeded)}
+            {renderDropdown('Estimated Usage', duration, USAGE_OPTIONS, 'duration', setDuration)}
+            {renderDropdown('Car Type', carType, ['Manual', 'Automatic'], 'car', setCarType)}
+            {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV'], 'vehicle', setVehicleType)}
+
+            {/* FARE */}
+            <View style={styles.fareCard}>
+              <Text>Estimated fare</Text>
+              <Text style={styles.price}>₹500</Text>
+            </View>
+
+            {/* TERMS */}
+            <View style={styles.checkboxRow}>
+              <TouchableOpacity onPress={() => setAgree(!agree)}>
+                <View style={[styles.checkbox, agree && styles.checked]} />
+              </TouchableOpacity>
+              <Text>
+                I agree to the{' '}
+                <Text
+                  style={{ fontWeight: 'bold', color: '#0066cc', textDecorationLine: 'underline' }}
+                  onPress={() => setShowTerms(true)}
+                >
+                  Terms and Conditions
+                </Text>
+              </Text>
+            </View>
+          </>
+        }
+      />
+
+      {/* STICKY BOTTOM BUTTON */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity 
+          style={[styles.button, (!isFormValid || loading) && styles.disabledButton]} 
+          onPress={handleBook}
+          disabled={!isFormValid || loading}
         >
-          <Text style={styles.tabText}>Local</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, serviceType === 'OUTSTATION' && styles.activeTab]}
-          onPress={() => setServiceType('OUTSTATION')}
-        >
-          <Text style={styles.tabText}>Outstation</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Request Driver</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* ONE WAY / ROUND */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.tab, tripType === 'One Way' && styles.activeTab]}
-          onPress={() => setTripType('One Way')}
-        >
-          <Text style={styles.tabText}>One Way</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, tripType === 'Round Trip' && styles.activeTab]}
-          onPress={() => setTripType('Round Trip')}
-        >
-          <Text style={styles.tabText}>Round Trip</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* LOCATIONS */}
-      <TextInput
-        style={styles.input}
-        placeholder="Pickup Location"
-        value={from}
-        onChangeText={setFrom}
+      <TermsAndConditionsModal
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
       />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Drop Location"
-        value={to}
-        onChangeText={setTo}
-      />
-
-      {/* ========================= */}
-{/* 🔥 OUTSTATION DESIGN ONLY */}
-{/* ========================= */}
-
-{serviceType === 'OUTSTATION' ? (
-  <>
-    {/* CHOOSE SERVICE */}
-    {renderDropdown('Choose Service', driverType, SERVICE_OPTIONS, 'driver', setDriverType)}
-
-    {/* SCHEDULE DETAILS */}
-    <Text style={styles.label}>Schedule Details</Text>
-
-    {/* Trip Type + Duration */}
-    <View style={styles.row}>
-      <View style={{ flex: 1 }}>
-        {renderDropdown('', tripType, ['One Way', 'Round Trip'], 'trip', setTripType)}
-      </View>
-
-      <View style={{ flex: 1 }}>
-        {renderDropdown('', duration, USAGE_OPTIONS, 'duration', setDuration)}
-      </View>
-    </View>
-
-    {/* DATE + TIME */}
-    <Text style={styles.label}>Date & Time</Text>
-    <View style={styles.row}>
-      <TextInput
-        style={[styles.input, { flex: 1 }]}
-        placeholder="dd-mm-yyyy"
-      />
-      <TextInput
-        style={[styles.input, { flex: 1 }]}
-        placeholder="Select time"
-      />
-    </View>
-
-    {/* CAR TYPE */}
-    <Text style={styles.label}>Car Type</Text>
-    <View style={styles.row}>
-      <View style={{ flex: 1 }}>
-        {renderDropdown('', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
-      </View>
-
-      <View style={{ flex: 1 }}>
-        {renderDropdown('', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
-      </View>
-    </View>
-  </>
-) : (
-  <>
-    {/* ✅ KEEP LOCAL SAME (NO CHANGE) */}
-
-    {renderDropdown('Choose Service', driverType, SERVICE_OPTIONS, 'driver', setDriverType)}
-
-    {renderDropdown('When do you need?', whenNeeded, ['Immediately', 'Schedule'], 'when', setWhenNeeded)}
-
-    {renderDropdown('Estimated Usage', duration, USAGE_OPTIONS, 'duration', setDuration)}
-
-    {renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
-
-    {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
-  </>
-)}
-      {/* FARE CARD */}
-      <View style={styles.fareCard}>
-        <Text style={styles.fareTitle}>Estimated fare</Text>
-        <Text style={styles.price}>₹500</Text>
-        <Text style={styles.small}>4 Hour Local Package</Text>
-
-        <Text style={styles.small}>Extra per hour: ₹100</Text>
-      </View>
-
-      {/* TERMS */}
-      <View style={styles.checkboxRow}>
-        <TouchableOpacity onPress={() => setAgree(!agree)}>
-          <View style={[styles.checkbox, agree && styles.checked]} />
-        </TouchableOpacity>
-        <Text style={styles.termsText}>
-          I agree to the{' '}
-          <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>
-            Terms & Conditions
-          </Text>
-        </Text>
-      </View>
-
-      {/* BUTTON */}
-      <TouchableOpacity style={styles.button} onPress={handleBook}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Request Driver</Text>
-        )}
-      </TouchableOpacity>
-
-      <TermsAndConditionsModal 
-        isOpen={showTerms} 
-        onClose={() => setShowTerms(false)} 
-      />
-    </ScrollView>
+    </SafeAreaView>
   );
 };
+
+export default BookScreen;
 
 const styles = StyleSheet.create({
   container: { padding: 20 },
@@ -268,106 +327,53 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
 
-  smallTab: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#eee',
-    borderRadius: 8,
-    alignItems: 'center'
-  },
+  activeTab: { backgroundColor: '#000' },
 
-  activeTab: {
-    backgroundColor: '#000'
-  },
-
-  tabText: {
-    color: '#fff',
-    fontWeight: 'bold'
-  },
+  tabText: { color: '#fff', fontWeight: 'bold' },
 
   input: {
     backgroundColor: '#eee',
     padding: 15,
-    borderRadius: 10,
-    marginBottom: 15
+    borderRadius: 10
   },
 
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 5
-  },
+  label: { fontWeight: 'bold', marginBottom: 5 },
 
   dropdownBox: {
     backgroundColor: '#eee',
     padding: 15,
     borderRadius: 10,
-    marginBottom: 15,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: 'space-between'
   },
 
-  dropdownBoxText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-
-  dropdownIcon: {
-    fontSize: 12,
-    color: '#666'
-  },
+  dropdownBoxText: { color: '#333' },
 
   dropdownList: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    marginTop: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#ddd'
+    backgroundColor: '#fff',
+    borderRadius: 10
   },
 
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
+  dropdownItem: { padding: 15 },
 
-  dropdownItemText: {
-    color: '#444',
-  },
+  dropdownItemText: { color: '#444' },
 
-  dropdownItemTextSelected: {
-    color: '#000',
-    fontWeight: 'bold'
-  },
+  dropdownItemTextSelected: { fontWeight: 'bold' },
 
   fareCard: {
     backgroundColor: '#e6f5f1',
     padding: 15,
-    borderRadius: 12,
+    borderRadius: 10,
     marginBottom: 15
   },
 
-  fareTitle: {
-    color: '#666'
-  },
-
-  price: {
-    fontSize: 28,
-    fontWeight: 'bold'
-  },
-
-  small: {
-    fontSize: 12,
-    color: '#666'
-  },
+  price: { fontSize: 24, fontWeight: 'bold' },
 
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 20
+    marginBottom: 20,
+    gap: 10
   },
 
   checkbox: {
@@ -376,30 +382,38 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
 
-  checked: {
-    backgroundColor: '#000'
-  },
-
-  termsText: {
-    color: '#333'
-  },
-
-  termsLink: {
-    fontWeight: 'bold',
-    textDecorationLine: 'underline'
-  },
+  checked: { backgroundColor: '#000' },
 
   button: {
     backgroundColor: '#000',
     padding: 15,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+  },
+
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
 
   buttonText: {
     color: '#fff',
     fontWeight: 'bold'
+  },
+
+  bottomContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+
+  locationBtn: {
+    marginBottom: 15,
+    alignSelf: 'flex-start'
+  },
+
+  locationBtnText: {
+    color: '#0066cc',
+    fontWeight: 'bold'
   }
 });
-
-export default BookScreen;
