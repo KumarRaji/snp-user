@@ -16,16 +16,34 @@ import { createTrip } from '../api/tripApi';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TermsAndConditionsModal from './TermsAndConditionsModal';
+import { Ionicons } from '@expo/vector-icons';
+
+function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg: number) {
+  return deg * (Math.PI / 180);
+}
 
 const BookScreen = () => {
   const insets = useSafeAreaInsets();
 
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState<{ description: string; location: { lat: number; lng: number } | null }>({ description: '', location: null });
+  const [to, setTo] = useState<{ description: string; location: { lat: number; lng: number } | null }>({ description: '', location: null });
 
   const [serviceType, setServiceType] = useState('LOCAL_HOURLY');
   const [tripType, setTripType] = useState('One Way');
-  const [driverType, setDriverType] = useState('ACTING');
+  const [driverType, setDriverType] = useState('Acting Driver');
   const [whenNeeded, setWhenNeeded] = useState('Immediately');
   const [duration, setDuration] = useState('4 Hrs');
   const [carType, setCarType] = useState('Manual');
@@ -55,14 +73,17 @@ const BookScreen = () => {
     serviceType === 'OUTSTATION' || tripType === 'One Way';
 
   const isFormValid =
-    from.trim() !== '' &&
-    (showDropLocation ? to.trim() !== '' : true) &&
+    from.description.trim() !== '' &&
+    (showDropLocation ? to.description.trim() !== '' : true) &&
     agree;
 
+  const showScheduleFields =
+    serviceType === 'OUTSTATION' || whenNeeded === 'Schedule';
+
   const resetForm = () => {
-    setFrom('');
-    setTo('');
-    setDriverType('ACTING');
+    setFrom({ description: '', location: null });
+    setTo({ description: '', location: null });
+    setDriverType('Acting Driver');
     setWhenNeeded('Immediately');
     setCarType('Manual');
     setVehicleType('Hatchback');
@@ -77,59 +98,93 @@ const BookScreen = () => {
   const fetchEstimate = async () => {
     try {
       setEstimateLoading(true);
-  
-      const hours = parseInt(duration); // "4 Hrs" -> 4
-      const packageType = serviceType === 'OUTSTATION' ? 'OUTSTATION' : 'LOCAL';
-  
-      let url = `https://drivemate.api.luisant.cloud/api/pricing-packages/estimate?packageType=${packageType}&hours=${hours}`;
       
-      if (packageType === 'OUTSTATION') {
-        url += '&distance=100'; // Default distance for outstation estimate
-      }
+      const packageType = serviceType;
+      let url = `https://drivemate.api.luisant.cloud/api/pricing-packages/estimate?packageType=${packageType}`;
+      let hours = parseInt(duration);
 
+      if (packageType === 'LOCAL_HOURLY') {
+        url += `&hours=${hours}&distance=0`;
+      } else { // OUTSTATION
+        if (!from.location || !to.location) {
+          setEstimate(null);
+          setPricing(null);
+          setEstimateLoading(false);
+          return;
+        }
+
+        let distance = getDistanceFromLatLonInKm(from.location.lat, from.location.lng, to.location.lat, to.location.lng);
+        
+        if (tripType === 'Round Trip') {
+            distance *= 2;
+        }
+
+        url += `&distance=${Math.round(distance)}`;
+      }
+      
       const res = await fetch(url);
-  
       const data = await res.json();
   
       let finalEstimate = data.estimate;
       let finalPricing = data.pricing;
 
-      // Fallbacks if API is missing data (especially for LOCAL)
-      if (!finalEstimate && packageType === 'LOCAL') {
-        finalEstimate = hours === 4 ? 500 : (hours * 125);
+      if (packageType === 'OUTSTATION' && data.pricing?.hours) {
+        setDuration(`${data.pricing.hours} Hrs`);
+        hours = data.pricing.hours; // update hours for fallback logic
+      }
+
+      // Fallbacks if API is missing data
+      if (!finalEstimate && packageType === 'LOCAL_HOURLY') {
+        finalEstimate = hours === 4 ? 500 : hours * 125;
       }
       if (!finalPricing) {
         finalPricing = {
-          description: `${hours} Hrs ${packageType === 'LOCAL' ? 'Local' : 'Outstation'} Package`,
+          description: `${hours} Hrs ${packageType === 'LOCAL_HOURLY' ? 'Local' : 'Outstation'} Package`,
           extraPerHour: 100
         };
+        if (packageType === 'OUTSTATION' && data.success === false) {
+          Alert.alert("Estimate Error", "Could not fetch estimate for the selected route.");
+        }
       }
 
       setEstimate(finalEstimate);
       setPricing(finalPricing);
     } catch (e) {
       console.log('Estimate error', e);
+      setEstimate(null);
+      setPricing(null);
     } finally {
       setEstimateLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchEstimate();
+    if (serviceType === 'LOCAL_HOURLY') {
+      fetchEstimate();
+    }
   }, [duration, serviceType]);
 
+  useEffect(() => {
+    if (serviceType === 'OUTSTATION' && from.location && to.location) {
+      fetchEstimate();
+    } else if (serviceType === 'OUTSTATION') {
+      setEstimate(null);
+      setPricing(null);
+    }
+  }, [from.location, to.location, tripType, serviceType]);
+
   const handleBook = async () => {
-    if (!from || (showDropLocation && !to)) {
+    if (!from.description || (showDropLocation && !to.description)) {
       Alert.alert('Required', 'Enter locations');
       return;
     }
 
-    if (!from.includes(',')) {
+    if (!from.description.includes(',')) {
       Alert.alert('Invalid', 'Select proper pickup location');
       return;
     }
 
-    if (showDropLocation && !to.includes(',')) {
+    if (showDropLocation && !to.description.includes(',')) {
       Alert.alert('Invalid', 'Select proper drop location');
       return;
     }
@@ -155,8 +210,8 @@ const BookScreen = () => {
       }
 
       const res = await createTrip({
-        pickupLocation: from,
-        dropLocation: showDropLocation ? to : '',
+        pickupLocation: from.description,
+        dropLocation: showDropLocation ? to.description : '',
         serviceType,
         tripType,
         driverType,
@@ -208,7 +263,10 @@ const BookScreen = () => {
           .filter(Boolean)
           .join(', ');
 
-        setFrom(formatted);
+        setFrom({
+          description: formatted,
+          location: { lat: loc.coords.latitude, lng: loc.coords.longitude },
+        });
         fromRef.current?.setAddressText(formatted);
       }
     } catch {
@@ -385,7 +443,7 @@ const BookScreen = () => {
                 ref={fromRef}
                 placeholder="Pickup Location"
                 fetchDetails={true}
-                onPress={(data) => setFrom(data.description)}
+                onPress={(data, details = null) => setFrom({ description: data.description, location: details?.geometry.location || null })}
                 query={{
                   key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8',
                   language: 'en',
@@ -411,7 +469,7 @@ const BookScreen = () => {
                   ref={toRef}
                   placeholder="Drop Location"
                   fetchDetails={true}
-                  onPress={(data) => setTo(data.description)}
+                  onPress={(data, details = null) => setTo({ description: data.description, location: details?.geometry.location || null })}
                   query={{
                     key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8',
                     language: 'en',
@@ -429,7 +487,7 @@ const BookScreen = () => {
             {/* SCHEDULE */}
             <Text style={styles.sectionTitle}>Schedule Details</Text>
 
-            {renderDropdown('Choose Service', driverType, ['ACTING','SPARE'], 'driver', setDriverType)}
+            {renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver', 'Weekly Driver', 'Monthly Driver'], 'driver', setDriverType)}
             {serviceType === 'OUTSTATION' ? (
               renderDropdown('Select Trip Type', tripType, ['One Way', 'Round Trip'], 'tripTypeDropdown', setTripType)
             ) : (
@@ -437,18 +495,22 @@ const BookScreen = () => {
             )}
             {renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
 
-            {/* DATE */}
-            <View style={{ marginBottom: 15 }}>
-              <Text style={styles.label}>Date</Text>
-              <TouchableOpacity style={styles.dropdownBox} onPress={() => setShowDatePicker(true)}>
-                <Text>{date ? date.split('-').reverse().join('-') : 'dd-mm-yyyy'}</Text>
-              </TouchableOpacity>
-            </View>
+            {showScheduleFields && (
+              <>
+                {/* DATE */}
+                <View style={{ marginBottom: 15 }}>
+                  <Text style={styles.label}>Date</Text>
+                  <TouchableOpacity style={styles.dropdownBox} onPress={() => setShowDatePicker(true)}>
+                    <Text>{date ? date.split('-').reverse().join('-') : 'dd-mm-yyyy'}</Text>
+                  </TouchableOpacity>
+                </View>
 
-            {/* TIME */}
-            {renderDropdown('Select Time', time || 'Select time', getAvailableTimeSlots(), 'time', setTime)}
+                {/* TIME */}
+                {renderDropdown('Select Time', time || 'Select time', getAvailableTimeSlots(), 'time', setTime)}
+              </>
+            )}
 
-            {showDatePicker && (
+            {showDatePicker && showScheduleFields && (
               <DateTimePicker
                 value={dateObj}
                 mode="date"
@@ -458,41 +520,44 @@ const BookScreen = () => {
               />
             )}
 
-            {renderDropdown('Car Type', carType, ['Manual','Automatic'], 'car', setCarType)}
-            {renderDropdown('Vehicle Type', vehicleType, ['Hatchback','Sedan'], 'vehicle', setVehicleType)}
+            {renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
+            {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
 
             {/* FARE */}
-            <View style={styles.fareCard}>
-              <Text style={styles.fareTitle}>Estimated fare</Text>
-            
-              {estimateLoading ? (
-                <ActivityIndicator />
-              ) : (
-                <>
-                  <Text style={styles.price}>₹{estimate || 0}</Text>
-            
-                  {pricing && (
-                    <>
-                      <Text style={styles.packageText}>
-                        {pricing.description}
-                      </Text>
-            
-                      <View style={styles.divider} />
-            
-                      <Text style={styles.extraText}>
-                        EXTRA PER HOUR: ₹{pricing.extraPerHour}
-                      </Text>
-            
-                      <TouchableOpacity onPress={() => setShowChargesModal(true)}>
-                        <Text style={styles.moreText}>
-                          ℹ More charges apply
+            {!(serviceType === 'OUTSTATION' && !estimate) && (
+              <View style={styles.fareCard}>
+                <Text style={styles.fareTitle}>Estimated fare</Text>
+              
+                {estimateLoading ? (
+                  <ActivityIndicator />
+                ) : (
+                  <>
+                    <Text style={styles.price}>₹{estimate || 0}</Text>
+              
+                    {pricing && (
+                      <>
+                        <Text style={styles.packageText}>
+                          {pricing.description}
                         </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </>
-              )}
-            </View>
+              
+                        <View style={styles.divider} />
+              
+                        <Text style={styles.extraText}>
+                          EXTRA PER HOUR: ₹{pricing.extraPerHour}
+                        </Text>
+              
+                        <TouchableOpacity style={styles.moreInfoBtn} onPress={() => setShowChargesModal(true)}>
+                          <Ionicons name="information-circle-outline" size={16} color="#0066cc" />
+                          <Text style={styles.moreText}>
+                            More charges apply
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </>
+                )}
+              </View>
+            )}
 
             {/* TERMS */}
             <View style={styles.checkboxRow}>
@@ -615,7 +680,8 @@ const styles = StyleSheet.create({
   packageText: { fontSize: 12, color: '#555', marginTop: 5 },
   divider: { height: 1, backgroundColor: '#cceae3', marginVertical: 10 },
   extraText: { fontSize: 12, fontWeight: 'bold', color: '#333', marginBottom: 5 },
-  moreText: { fontSize: 12, color: '#0066cc', marginTop: 5 },
+  moreInfoBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 4 },
+  moreText: { fontSize: 12, color: '#0066cc' },
 
   price: { fontSize: 24, fontWeight: 'bold' },
 
