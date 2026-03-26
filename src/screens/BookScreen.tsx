@@ -221,6 +221,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         duration,
         carType,
         vehicleType,
+        estimateAmount: estimate,
 
         // ✅ FIXED DATE TIME
         startDateTime: startDateTimeObj.toISOString(),
