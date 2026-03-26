@@ -90,12 +90,9 @@ const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { 
-    paddingTop: Platform.OS === 'android' ? 45 : 16, 
-    backgroundColor: '#fff', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#eee',
+    paddingTop: 10, 
+    backgroundColor: '#f5f5f5', 
     zIndex: 100,
-    elevation: 10,
   },
   headerTop: {
     flexDirection: 'row', 
@@ -104,7 +101,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
     zIndex: 100,
-    elevation: 10,
   },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
   profileSection: { flexDirection: 'row', alignItems: 'center', gap: 10 },

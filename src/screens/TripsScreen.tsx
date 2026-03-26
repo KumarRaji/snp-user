@@ -15,7 +15,25 @@ const TripsScreen = () => {
   const loadTrips = async () => {
     setLoading(true);
     const res = await getMyTrips();
-    setTrips(res.bookings || []);
+
+    const allBookings = res.bookings || [];
+
+    const processedTrips = allBookings.map((trip: any) => {
+      const allocatedStatuses = ['DRIVER_ALLOCATED', 'DRIVER ALLOCATED', 'ACCEPTED', 'ARRIVED', 'STARTED', 'ON_TRIP'];
+      if (allocatedStatuses.includes(trip.status)) {
+        // Normalize status to DRIVER_ALLOCATED to group them
+        return { ...trip, status: 'DRIVER_ALLOCATED' };
+      }
+      return trip;
+    });
+
+    // Only show trips with one of the 4 main statuses
+    const validStatuses = ['PENDING', 'CONFIRMED', 'DRIVER_ALLOCATED', 'COMPLETED'];
+    const filteredTrips = processedTrips.filter((trip: any) =>
+      validStatuses.includes(trip.status)
+    );
+
+    setTrips(filteredTrips);
     setLoading(false);
   };
 
@@ -25,10 +43,13 @@ const TripsScreen = () => {
 
     const rawType = item.serviceType || item.bookingType;
 
+    const assignedPerson = item.driver || item.lead;
+    const isLead = !!item.lead;
+
     // Status checks
     const isPending = item.status === 'PENDING';
     const isCompleted = item.status === 'COMPLETED';
-    const isAllocated = item.status === 'DRIVER_ALLOCATED' || item.status === 'DRIVER ALLOCATED' || item.status === 'ACCEPTED' || item.status === 'ARRIVED' || item.status === 'STARTED' || item.status === 'ON_TRIP';
+    const isAllocated = item.status === 'DRIVER_ALLOCATED';
 
     return (
       <View style={styles.card}>
@@ -48,7 +69,15 @@ const TripsScreen = () => {
               isAllocated && styles.badgeTextAllocated,
               isCompleted && styles.badgeTextCompleted
             ]}>
-              {item.status === 'DRIVER_ALLOCATED' ? 'DRIVER ALLOCATED' : item.status}
+              {isCompleted
+                ? 'COMPLETED'
+                : assignedPerson
+                ? (isLead ? 'LEAD ALLOCATED' : 'DRIVER ALLOCATED')
+                : item.selectedLeadPackageId
+                ? 'REQUEST SENT TO LEADS'
+                : item.status === 'CONFIRMED'
+                ? 'CONFIRMED'
+                : item.status}
             </Text>
           </View>
         </View>
@@ -61,7 +90,7 @@ const TripsScreen = () => {
         {/* PAYMENT */}
         {item.paymentMethod && (
           <Text style={styles.payment}>
-            Payment: {item.paymentMethod}
+            Payment: <Text style={{ fontWeight: 'bold' }}>{item.paymentMethod}</Text>
           </Text>
         )}
 
@@ -76,30 +105,9 @@ const TripsScreen = () => {
         </View>
 
         {/* DRIVER STATUS */}
-        {item.status === 'PENDING' && (
-          <View style={styles.findingBox}>
-            <Text style={styles.findingText}>
-              🔍 Finding available drivers...
-            </Text>
-          </View>
-        )}
-        {item.status === 'CONFIRMED' && (
-          <View style={styles.findingBox}>
-            <Text style={styles.findingText}>
-              🔍 Finding available drivers...
-            </Text>
-            <Text style={styles.findingText}>
-            Request sent to {rawType === 'OUTSTATION' ? 'OUTSTATION' : 'LOCAL'} drivers
-            </Text>
-          </View>
-        )}
-
-        {/* ✅ DRIVER ALLOCATED BLOCK */}
-        {/* Show driver details for allocated or completed trips */}
-        {(isAllocated || (isCompleted && item.driver)) && (
+        {assignedPerson ? (
           <View style={styles.driverBox}>
             
-            {/* ✅ THIS WAS MISSING */}
             <Text style={styles.driverHeader}>
               ✓ YOUR DRIVER
             </Text>
@@ -109,34 +117,36 @@ const TripsScreen = () => {
               {/* Avatar */}
               <View style={styles.driverAvatar}>
                 <Text style={styles.driverAvatarText}>
-                  {item.driver?.name?.[0] || 'D'}
+                  {assignedPerson?.name?.[0] || (isLead ? 'L' : 'D')}
                 </Text>
               </View>
         
               {/* Name + Phone */}
               <View style={{ flex: 1 }}>
                 <Text style={styles.driverName}>
-                  {item.driver?.name || 'Driver'}
+                  {assignedPerson?.name || (isLead ? 'Lead Pro' : 'Driver')}
                 </Text>
                 <Text style={styles.driverPhone}>
-                  {item.driver?.phone || ''}
+                  {assignedPerson?.phone || 'N/A'}
                 </Text>
               </View>
             
               {/* 📞 CALL BUTTON */}
-              <TouchableOpacity
-                style={styles.callButton}
-                onPress={() => Linking.openURL(`tel:${item.driver?.phone}`)}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>📞</Text>
-              </TouchableOpacity>
+              {assignedPerson?.phone && (
+                <TouchableOpacity
+                  style={styles.callButton}
+                  onPress={() => Linking.openURL(`tel:${assignedPerson.phone}`)}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>📞</Text>
+                </TouchableOpacity>
+              )}
             </View>
             
             {/* 👤 SHOW DRIVER PROFILE BUTTON */}
             <TouchableOpacity
               style={styles.profileBtn}
               onPress={() => {
-                setSelectedDriver(item.driver);
+                setSelectedDriver(assignedPerson);
                 setShowDriverModal(true);
               }}
             >
@@ -145,12 +155,40 @@ const TripsScreen = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : (item.status === 'PENDING' || item.status === 'CONFIRMED') ? (
+          item.selectedLeadPackageId ? (
+            <View style={styles.findingBox}>
+              <Text style={styles.findingText}>
+                Request sent to LEADS...
+              </Text>
+            </View>
+          ) : item.status === 'PENDING' ? (
+            <View style={styles.findingBox}>
+              <Text style={styles.findingText}>
+                🔍 Finding available drivers...
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.findingBox}>
+              <Text style={styles.findingText}>
+                🔍 Finding available drivers...
+              </Text>
+              <Text style={styles.findingText}>
+                Request sent to {rawType === 'OUTSTATION' ? 'OUTSTATION' : 'LOCAL'} drivers
+              </Text>
+            </View>
+          )
+        ) : null}
       </View>
     );
   };
 
   if (loading) return <ActivityIndicator style={{marginTop: 50}} size="large" />;
+
+  const getImgUrl = (val: any) => (typeof val === 'string' ? val : val?.url || val?.uri || null);
+
+  const profileImgUri = getImgUrl(selectedDriver?.documents?.photo || selectedDriver?.photo || selectedDriver?.profileImage || selectedDriver?.profilePic || selectedDriver?.avatar || selectedDriver?.image || selectedDriver?.profile_image);
+  const licenseImgUri = getImgUrl(selectedDriver?.documents?.dl || selectedDriver?.dlPhoto || selectedDriver?.drivingLicensePhoto || selectedDriver?.driving_license_photo || selectedDriver?.licenseImage || selectedDriver?.licenseProof || selectedDriver?.idProof || selectedDriver?.drivingLicense || selectedDriver?.licenseUrl || selectedDriver?.documentUrl || selectedDriver?.licenseFile || selectedDriver?.license_image || selectedDriver?.id_proof);
 
   return (
     <View style={{ flex: 1 }}>
@@ -179,7 +217,21 @@ const TripsScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+              
+              {/* Profile Image Preview */}
+              <View style={{ alignItems: 'center', marginBottom: 10 }}>
+                {profileImgUri ? (
+                  <Image source={{ uri: profileImgUri }} style={styles.modalProfileImage} />
+                ) : (
+                  <View style={styles.modalAvatarFallback}>
+                    <Text style={styles.modalAvatarText}>
+                      {selectedDriver?.name?.[0] || 'D'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               {/* Header */}
               <Text style={styles.modalTitle}>
                 {selectedDriver?.name}
@@ -245,19 +297,22 @@ const TripsScreen = () => {
                 </>
               )}
   
-              {/* License Image */}
-              {selectedDriver?.licenseImage && (
-                <Image source={{ uri: selectedDriver.licenseImage }} style={styles.licenseImage} resizeMode="contain" />
+              {/* License Image Preview */}
+              <Text style={styles.modalLabel}>Driving License Photo</Text>
+              {licenseImgUri ? (
+                <Image source={{ uri: licenseImgUri }} style={styles.licenseImage} resizeMode="contain" />
+              ) : (
+                <Text style={styles.modalValue}>Not available</Text>
               )}
-  
-              {/* Close */}
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setShowDriverModal(false)}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Close</Text>
-              </TouchableOpacity>
             </ScrollView>
+
+            {/* Sticky Close Button */}
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setShowDriverModal(false)}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -418,16 +473,22 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '85%'
   },
+  modalProfileImage: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f0f0f0' },
+  modalAvatarFallback: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#166534', justifyContent: 'center', alignItems: 'center' },
+  modalAvatarText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   modalLabel: { fontSize: 12, color: '#666', marginTop: 10 },
   modalValue: { fontSize: 16, color: '#333', fontWeight: 'bold', marginTop: 2 },
   licenseImage: { width: '100%', height: 150, marginTop: 15, borderRadius: 8, backgroundColor: '#f9f9f9' },
   closeBtn: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
     backgroundColor: '#000',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20
   }
 });
 
