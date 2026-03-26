@@ -35,7 +35,7 @@ function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
-const BookScreen = () => {
+const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => {
   const insets = useSafeAreaInsets();
 
   const [from, setFrom] = useState<{ description: string; location: { lat: number; lng: number } | null }>({ description: '', location: null });
@@ -59,6 +59,7 @@ const BookScreen = () => {
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showChargesModal, setShowChargesModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const fromRef = useRef<any>(null);
@@ -173,7 +174,9 @@ const BookScreen = () => {
     }
   }, [from.location, to.location, tripType, serviceType]);
 
-  const handleBook = async () => {
+  const handleBook = async (paymentMethod: string) => {
+    setShowPaymentModal(false);
+
     if (!from.description || (showDropLocation && !to.description)) {
       Alert.alert('Required', 'Enter locations');
       return;
@@ -222,11 +225,14 @@ const BookScreen = () => {
         // ✅ FIXED DATE TIME
         startDateTime: startDateTimeObj.toISOString(),
 
-        paymentMethod: 'CASH'
+        paymentMethod: paymentMethod
       });
 
       if (res.success) {
-        Alert.alert('Success', 'Driver request sent');
+        Alert.alert('Success', 'Booking request sent to drivers!');
+        if (onBookingSuccess) {
+          onBookingSuccess();
+        }
       } else {
         Alert.alert('Error', 'Failed');
       }
@@ -584,7 +590,7 @@ const BookScreen = () => {
             styles.button,
             (!isFormValid || loading) && styles.disabledButton
           ]}
-          onPress={handleBook}
+          onPress={() => setShowPaymentModal(true)}
           disabled={!isFormValid || loading}
         >
           {loading ? (
@@ -594,6 +600,46 @@ const BookScreen = () => {
           )}
         </TouchableOpacity>
       </View>
+
+      {showPaymentModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.paymentBox}>
+            
+            <Text style={styles.paymentTitle}>
+              Select Payment Method
+            </Text>
+
+            <Text style={styles.paymentSubtitle}>
+              Choose how you want to pay
+            </Text>
+
+            {/* CASH */}
+            <TouchableOpacity
+              style={[styles.paymentBtn, { backgroundColor: '#16a34a' }]}
+              onPress={() => handleBook('CASH')}
+            >
+              <Text style={styles.paymentText}>💳 Cash</Text>
+            </TouchableOpacity>
+
+            {/* UPI */}
+            <TouchableOpacity
+              style={[styles.paymentBtn, { backgroundColor: '#2563eb' }]}
+              onPress={() => handleBook('UPI')}
+            >
+              <Text style={styles.paymentText}>💬 UPI</Text>
+            </TouchableOpacity>
+
+            {/* CANCEL */}
+            <TouchableOpacity
+              style={{ marginTop: 15 }}
+              onPress={() => setShowPaymentModal(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      )}
 
       <TermsAndConditionsModal
         isOpen={showTerms}
@@ -760,5 +806,18 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 16, fontWeight: 'bold' },
   closeBtn: { fontSize: 20, color: '#999', paddingHorizontal: 5 },
-  modalText: { fontSize: 14, color: '#444', lineHeight: 22 }
+  modalText: { fontSize: 14, color: '#444', lineHeight: 22 },
+
+  paymentBox: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center'
+  },
+  paymentTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
+  paymentSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
+  paymentBtn: { width: '100%', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+  paymentText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  cancelText: { color: '#999', fontSize: 16, fontWeight: 'bold' }
 });

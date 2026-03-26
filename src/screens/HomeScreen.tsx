@@ -72,7 +72,7 @@ const HomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {tab === 'BOOK' && <BookScreen />}
+        {tab === 'BOOK' && <BookScreen onBookingSuccess={() => setTab('TRIPS')} />}
         {tab === 'TRIPS' && <TripsScreen />}
         {tab === 'PROFILE' && <ProfileScreen profile={profile} navigation={navigation} />}
       </View>
