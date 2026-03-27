@@ -10,6 +10,9 @@ import {
   ScrollView
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MapView, { Marker } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
+
 
 import * as Location from 'expo-location';
 import { createTrip } from '../api/tripApi';
@@ -17,6 +20,10 @@ import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplet
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TermsAndConditionsModal from './TermsAndConditionsModal';
 import { Ionicons } from '@expo/vector-icons';
+
+// for example, using environment variables, and not to hardcode it.
+// Make sure this key has "Directions API", "Places API", and "Maps SDK for Android/iOS" enabled in your Google Cloud Console.
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8';
 
 function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // Radius of the earth in km
@@ -64,6 +71,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
   const fromRef = useRef<any>(null);
   const toRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
 
   const [estimate, setEstimate] = useState<number | null>(null);
   const [pricing, setPricing] = useState<any>(null);
@@ -173,6 +181,18 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       setPricing(null);
     }
   }, [from.location, to.location, tripType, serviceType]);
+
+  // Smoothly animate map to pickup location if drop-off isn't selected yet
+  useEffect(() => {
+    if (from.location && mapRef.current && !to.location) {
+      mapRef.current.animateToRegion({
+        latitude: from.location.lat,
+        longitude: from.location.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 1000);
+    }
+  }, [from.location, to.location]);
 
   const handleBook = async (paymentMethod: string) => {
     setShowPaymentModal(false);
@@ -450,9 +470,15 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                 ref={fromRef}
                 placeholder="Pickup Location"
                 fetchDetails={true}
-                onPress={(data, details = null) => setFrom({ description: data.description, location: details?.geometry.location || null })}
+                onPress={(data, details = null) => {
+                  if (!details?.geometry?.location) {
+                    Alert.alert('Error', 'Could not get location coordinates. Ensure Places API is enabled.');
+                  }
+                  setFrom({ description: data.description, location: details?.geometry?.location || null })
+                }}
+                onFail={(error) => console.log('Places Error:', error)}
                 query={{
-                  key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8',
+                  key: GOOGLE_MAPS_API_KEY,
                   language: 'en',
                   components: 'country:in'
                 }}
@@ -476,9 +502,15 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   ref={toRef}
                   placeholder="Drop Location"
                   fetchDetails={true}
-                  onPress={(data, details = null) => setTo({ description: data.description, location: details?.geometry.location || null })}
+                  onPress={(data, details = null) => {
+                    if (!details?.geometry?.location) {
+                      Alert.alert('Error', 'Could not get location coordinates. Ensure Places API is enabled.');
+                    }
+                    setTo({ description: data.description, location: details?.geometry?.location || null })
+                  }}
+                  onFail={(error) => console.log('Places Error:', error)}
                   query={{
-                    key: 'AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8',
+                    key: GOOGLE_MAPS_API_KEY,
                     language: 'en',
                     components: 'country:in'
                   }}
@@ -488,6 +520,72 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                     listView: { backgroundColor: '#fff', elevation: 3, borderRadius: 8, position: 'absolute', top: 55, zIndex: 10, width: '100%' }
                   }}
                 />
+              </View>
+            )}
+
+            {/* ✅ MAP PREVIEW */}
+            {from.location && (
+              <View style={styles.mapContainer}>
+                <MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: to.location ? (from.location.lat + to.location.lat) / 2 : from.location.lat,
+                    longitude: to.location ? (from.location.lng + to.location.lng) / 2 : from.location.lng,
+                    latitudeDelta: to.location ? Math.abs(from.location.lat - to.location.lat) * 1.5 + 0.02 : 0.05,
+                    longitudeDelta: to.location ? Math.abs(from.location.lng - to.location.lng) * 1.5 + 0.02 : 0.05,
+                  }}
+                >
+                  {/* Pickup Marker */}
+                  <Marker
+                    coordinate={{
+                      latitude: from.location.lat,
+                      longitude: from.location.lng,
+                    }}
+                    title="Pickup"
+                    pinColor="green"
+                  />
+
+                  {/* Drop-off Marker (only if 'to' location exists) */}
+                  {to.location && (
+                    <Marker
+                      coordinate={{
+                        latitude: to.location.lat,
+                        longitude: to.location.lng,
+                      }}
+                      title="Drop"
+                      pinColor="red"
+                    />
+                  )}
+
+                  {/* Route Directions (only if both locations exist) */}
+                  {to.location && (
+                    <MapViewDirections
+                      origin={{
+                        latitude: from.location.lat,
+                        longitude: from.location.lng,
+                      }}
+                      destination={{
+                        latitude: to.location.lat,
+                        longitude: to.location.lng,
+                      }}
+                      apikey={GOOGLE_MAPS_API_KEY}
+                      strokeWidth={4}
+                      strokeColor="black"
+                      mode="DRIVING"
+                      onReady={(result) => {
+                        mapRef.current?.fitToCoordinates(result.coordinates, {
+                          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                          animated: true,
+                        });
+                      }}
+                      onError={(error) => {
+                        console.log('MapViewDirections Error:', error);
+                        Alert.alert('Directions Error', 'Could not draw the route. The API key might be invalid or the locations are not reachable by car.');
+                      }}
+                    />
+                  )}
+                </MapView>
               </View>
             )}
 
@@ -821,5 +919,15 @@ const styles = StyleSheet.create({
   paymentSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
   paymentBtn: { width: '100%', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
   paymentText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  cancelText: { color: '#999', fontSize: 16, fontWeight: 'bold' }
+  cancelText: { color: '#999', fontSize: 16, fontWeight: 'bold' },
+  mapContainer: {
+    height: 250,
+    width: '100%',
+    marginBottom: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  map: {
+    flex: 1,
+  },
 });

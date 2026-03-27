@@ -12,7 +12,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +25,12 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.kumarrit82291.snpuser"
+      "package": "com.kumarrit82291.snpuser",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
