@@ -399,8 +399,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   setDuration('4 Hrs');
                   resetForm();
                 }}
-              >
-                <Text style={styles.tabText}>Local</Text>
+            > 
+                <Text style={[styles.tabText, serviceType === 'LOCAL_HOURLY' && styles.activeTabText]}>Local</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -414,8 +414,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   setDuration('8 Hrs'); // ✅ default like web
                   resetForm();
                 }}
-              >
-                <Text style={styles.tabText}>Outstation</Text>
+            > 
+                <Text style={[styles.tabText, serviceType === 'OUTSTATION' && styles.activeTabText]}>Outstation</Text>
               </TouchableOpacity>
             </View>
 
@@ -429,7 +429,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   ]}
                   onPress={() => setTripType('One Way')}
                 >
-                  <Text style={styles.tabText}>One Way</Text>
+                  <Text style={[styles.tabText, tripType === 'One Way' && styles.activeTabText]}>One Way</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -439,7 +439,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   ]}
                   onPress={() => setTripType('Round Trip')}
                 >
-                  <Text style={styles.tabText}>Round Trip</Text>
+                  <Text style={[styles.tabText, tripType === 'Round Trip' && styles.activeTabText]}>Round Trip</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -457,7 +457,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   components: 'country:in'
                 }}
                 styles={{
-                  textInput: [styles.input, { marginBottom: 0 }],
+                  textInput: [styles.input, { marginBottom: 0, color: '#000' }], // Added color for placeholder
                   container: { flex: 0, marginBottom: 5 },
                   listView: { backgroundColor: '#fff', elevation: 3, borderRadius: 8, position: 'absolute', top: 55, zIndex: 10, width: '100%' }
                 }}
@@ -687,7 +687,8 @@ const styles = StyleSheet.create({
 
   activeTab: { backgroundColor: '#000' },
 
-  tabText: { color: '#fff', fontWeight: 'bold' },
+  tabText: { color: '#999', fontWeight: '600' }, // Reduced boldness for inactive tabs and set placeholder color
+  activeTabText: { color: '#fff' }, // Added for active tab text color
 
   input: {
     backgroundColor: '#eee',

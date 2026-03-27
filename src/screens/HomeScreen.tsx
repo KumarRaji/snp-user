@@ -46,7 +46,9 @@ const HomeScreen = ({ navigation }: any) => {
             <TouchableOpacity style={styles.profileSection} onPress={() => setShowLogoutMenu(!showLogoutMenu)}>
               <Text style={styles.greetingText}>{profile?.name || 'User'}</Text>
               <View style={styles.avatarMini}>
-                <Text style={styles.avatarMiniText}>{profile?.name?.[0]?.toUpperCase() || 'U'}</Text>
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarMiniText}>{profile?.name?.[0]?.toUpperCase() || 'U'}</Text>
+                </View>
               </View>
             </TouchableOpacity>
 
@@ -91,7 +93,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { 
     paddingTop: 10, 
-    backgroundColor: '#f5f5f5', 
+    backgroundColor: '#000', 
     zIndex: 100,
   },
   headerTop: {
@@ -102,11 +104,13 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     zIndex: 100,
   },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
   profileSection: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarMini: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  avatarMiniText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  greetingText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  greetingText: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  avatarMini: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  avatarMiniText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
+
   logoutMenu: {
     position: 'absolute',
     top: 50,
