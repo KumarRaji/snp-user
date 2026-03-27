@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import BookScreen from './BookScreen';
 import TripsScreen from './TripsScreen';
 import ProfileScreen from './ProfileScreen';
 import CompleteProfileModal from './CompleteProfileModal';
 import { getProfile } from '../api/authApi';
+import { useAuth } from '../context/AuthContext';
 
 const HomeScreen = ({ navigation }: any) => {
+  const { logout } = useAuth();
   const [tab, setTab] = useState<'BOOK' | 'TRIPS' | 'PROFILE'>('BOOK');
   const [profile, setProfile] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
@@ -31,8 +32,7 @@ const HomeScreen = ({ navigation }: any) => {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
-    navigation.replace('Login');
+    await logout();
   };
 
   return (
