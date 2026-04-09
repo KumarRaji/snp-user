@@ -95,13 +95,24 @@ const TripsScreen = () => {
         )}
 
         {/* ROUTE */}
-        <View style={styles.route}>
-          <Text style={styles.label}>From:</Text>
-          <Text style={styles.value} numberOfLines={1}>{item.pickupLocation}</Text>
-          <Text style={[styles.label, {marginTop: 5}]}>To:</Text>
-          <Text style={styles.value} numberOfLines={1}>
-            {item.dropLocation ? item.dropLocation : 'Round trips'}
-          </Text>
+        <View style={styles.routeContainer}>
+          <View style={styles.routeVisual}>
+            <View style={styles.dotStart} />
+            <View style={styles.line} />
+            <View style={styles.dotEnd} />
+          </View>
+          <View style={styles.routeTextContainer}>
+            <View style={styles.routeTextRow}>
+              <Text style={styles.label}>From:</Text>
+              <Text style={styles.value} numberOfLines={1}>{item.pickupLocation}</Text>
+            </View>
+            <View style={[styles.routeTextRow, { marginBottom: 0 }]}>
+              <Text style={styles.label}>To:</Text>
+              <Text style={styles.value} numberOfLines={1}>
+                {item.dropLocation ? item.dropLocation : 'Round trips'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* DRIVER STATUS */}
@@ -403,10 +414,50 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
 
-  route: {
+  routeContainer: {
+    flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: '#eee',
-    paddingTop: 10
+    paddingTop: 15,
+    marginTop: 5,
+  },
+
+  routeVisual: {
+    alignItems: 'center',
+    marginRight: 10,
+    width: 16,
+  },
+
+  dotStart: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#16a34a',
+    marginTop: 4,
+  },
+
+  line: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#cbd5e1',
+    marginVertical: 4,
+    borderRadius: 2,
+  },
+
+  dotEnd: {
+    width: 10,
+    height: 10,
+    borderRadius: 2, // Slight square for differentiation at the destination
+    backgroundColor: '#ef4444',
+    marginBottom: 16, // Adjusts position to properly align with 'To' text
+  },
+
+  routeTextContainer: {
+    flex: 1,
+  },
+
+  routeTextRow: {
+    marginBottom: 12,
   },
 
   label: {
