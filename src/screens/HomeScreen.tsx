@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BookScreen from './BookScreen';
 import TripsScreen from './TripsScreen';
@@ -78,6 +78,13 @@ const HomeScreen = ({ navigation }: any) => {
         {tab === 'TRIPS' && <TripsScreen />}
         {tab === 'PROFILE' && <ProfileScreen profile={profile} navigation={navigation} />}
       </View>
+
+      {showLogoutMenu && (
+        <TouchableWithoutFeedback onPress={() => setShowLogoutMenu(false)}>
+          {/* This overlay will catch any clicks outside the logout menu and close it. */}
+          <View style={[StyleSheet.absoluteFill, { zIndex: 990 }]} />
+        </TouchableWithoutFeedback>
+      )}
 
       <CompleteProfileModal 
         visible={showModal} 
