@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import BookScreen from './BookScreen';
 import TripsScreen from './TripsScreen';
 import ProfileScreen from './ProfileScreen';
@@ -14,20 +15,42 @@ const HomeScreen = ({ navigation }: any) => {
   const [profile, setProfile] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   useEffect(() => {
+    loadLocalProfile();
     loadProfile();
   }, []);
 
-  const loadProfile = async () => {
-    const data = await getProfile();
-    
-    // Safely extract the user object depending on how your API nests it
-    const userData = data?.user || data?.data || data;
-    setProfile(userData);
+  const loadLocalProfile = async () => {
+    try {
+      const data = await AsyncStorage.getItem('profile');
+      if (data) {
+        setProfile(JSON.parse(data));
+        setIsProfileLoading(false);
+      }
+    } catch (e) {
+      console.log('Error loading local profile', e);
+    }
+  };
 
-    if (userData && (!userData.email || !userData.address)) {
-      setShowModal(true);
+  const loadProfile = async () => {
+    if (!profile) setIsProfileLoading(true);
+    try {
+      const data = await getProfile();
+      
+      // Safely extract the user object depending on how your API nests it
+      const userData = data?.user || data?.data || data;
+      if (userData) {
+        setProfile(userData);
+        AsyncStorage.setItem('profile', JSON.stringify(userData)).catch(console.log);
+      }
+
+      if (userData && (!userData.email || !userData.address)) {
+        setShowModal(true);
+      }
+    } finally {
+      setIsProfileLoading(false);
     }
   };
 
@@ -43,13 +66,21 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.headerTitle}>SNP</Text>
 
           <View style={{ zIndex: 100, elevation: 10 }}>
-            <TouchableOpacity style={styles.profileSection} onPress={() => setShowLogoutMenu(!showLogoutMenu)}>
-              <Text style={styles.greetingText}>{profile?.name || 'User'}</Text>
-              <View style={styles.avatarMini}>
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarMiniText}>{profile?.name?.[0]?.toUpperCase() || 'U'}</Text>
+            <TouchableOpacity style={styles.profileSection} onPress={() => profile && setShowLogoutMenu(!showLogoutMenu)}>
+              {profile ? (
+                <>
+                  <Text style={styles.greetingText}>{profile.name}</Text>
+                  <View style={styles.avatarMini}>
+                    <View style={styles.avatarCircle}>
+                      <Text style={styles.avatarMiniText}>{profile.name?.[0]?.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.loaderContainer}>
+                  <ActivityIndicator color="#fff" size="small" />
                 </View>
-              </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -116,6 +147,7 @@ const styles = StyleSheet.create({
   avatarMini: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   avatarMiniText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
+  loaderContainer: { height: 36, justifyContent: 'center', alignItems: 'center', minWidth: 80 },
 
   logoutMenu: {
     position: 'absolute',
