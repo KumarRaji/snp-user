@@ -51,12 +51,6 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
               </View>
             </TouchableOpacity>
-
-            {showLogoutMenu && (
-              <TouchableOpacity style={styles.logoutMenu} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Logout</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </View>
@@ -80,10 +74,15 @@ const HomeScreen = ({ navigation }: any) => {
       </View>
 
       {showLogoutMenu && (
-        <TouchableWithoutFeedback onPress={() => setShowLogoutMenu(false)}>
-          {/* This overlay will catch any clicks outside the logout menu and close it. */}
-          <View style={[StyleSheet.absoluteFill, { zIndex: 990 }]} />
-        </TouchableWithoutFeedback>
+        <>
+          <TouchableWithoutFeedback onPress={() => setShowLogoutMenu(false)}>
+            {/* This overlay will catch any clicks outside the logout menu and close it. */}
+            <View style={[StyleSheet.absoluteFill, { zIndex: 990 }]} />
+          </TouchableWithoutFeedback>
+          <TouchableOpacity style={styles.logoutMenu} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </>
       )}
 
       <CompleteProfileModal 
@@ -120,8 +119,8 @@ const styles = StyleSheet.create({
 
   logoutMenu: {
     position: 'absolute',
-    top: 50,
-    right: -5,
+    top: 80,
+    right: 20,
     backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 12,
