@@ -35,13 +35,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "257d7bec-ba10-44fb-91d5-a6fb17faa985"
-      }
-    },
     "plugins": [
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "59d7eb03-6975-4eab-8fba-1183d4e970d2"
+      }
+    },
+    "owner": "kumarr2291"
   }
 }
