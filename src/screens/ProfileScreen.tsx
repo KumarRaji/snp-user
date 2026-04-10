@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { updateProfile } from '../api/authApi';
 import { uploadFile } from '../api/uploadApi';
 
-const ProfileScreen = ({ profile, navigation }: any) => {
+const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -126,10 +126,15 @@ const ProfileScreen = ({ profile, navigation }: any) => {
       const res = await updateProfile(form);
 
       if (res.success) {
+        // Refresh parent component which will update AsyncStorage and profile state
+        if (onProfileUpdate) {
+          await onProfileUpdate();
+        }
+
         Alert.alert('Success', 'Profile updated');
         setIsEditing(false);
       } else {
-        Alert.alert('Error', res.message);
+        Alert.alert('Error', res.message || 'Failed to update profile');
       }
     } catch (e) {
       Alert.alert('Error', 'Something went wrong');
