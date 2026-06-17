@@ -232,10 +232,15 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         startDateTimeObj.setHours(hrs, parseInt(minutes, 10), 0, 0);
       }
 
+      // Map internal serviceType to admin-friendly label (match web)
+      const serviceTypeForAdmin =
+        serviceType === 'LOCAL_HOURLY' ? 'Local - Hourly' :
+        serviceType === 'OUTSTATION' ? 'Outstation' : serviceType;
+
       const res = await createTrip({
         pickupLocation: from.description,
         dropLocation: showDropLocation ? to.description : '',
-        serviceType,
+        serviceType: serviceTypeForAdmin,
         tripType,
         driverType,
         duration,
