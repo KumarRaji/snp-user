@@ -167,11 +167,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutText: { color: 'red', fontWeight: 'bold', fontSize: 14 },
-  topTabBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 15 },
+  topTabBar: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 15 },
   content: { flex: 1 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f5f5f5' },
+  tab: { flex: 1, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: '#f5f5f5', alignItems: 'center' },
   activeTab: { backgroundColor: '#000' },
-  tabText: { color: '#666', fontWeight: 'bold', fontSize: 12 },
+  tabText: { color: '#666', fontWeight: 'bold', fontSize: 14 },
   activeTabText: { color: '#fff' }
 });
 

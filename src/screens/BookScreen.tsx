@@ -50,7 +50,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
   const [serviceType, setServiceType] = useState('LOCAL_HOURLY');
   const [tripType, setTripType] = useState('One Way');
-  const [driverType, setDriverType] = useState('Acting Driver');
+  const [driverType, setDriverType] = useState('Daily Driver');
   const [whenNeeded, setWhenNeeded] = useState('Immediately');
   const [duration, setDuration] = useState('4 Hrs');
   const [carType, setCarType] = useState('Manual');
@@ -92,7 +92,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const resetForm = () => {
     setFrom({ description: '', location: null });
     setTo({ description: '', location: null });
-    setDriverType('Acting Driver');
+    setDriverType('Daily Driver');
     setWhenNeeded('Immediately');
     setCarType('Manual');
     setVehicleType('Hatchback');
@@ -237,12 +237,19 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         serviceType === 'LOCAL_HOURLY' ? 'Local - Hourly' :
         serviceType === 'OUTSTATION' ? 'Outstation' : serviceType;
 
+      const normalizedDriverType =
+        driverType === 'Daily Driver' ||
+        driverType === 'Weekly Driver' ||
+        driverType === 'Monthly Driver'
+          ? 'Acting Driver'
+          : driverType;
+
       const res = await createTrip({
         pickupLocation: from.description,
         dropLocation: showDropLocation ? to.description : '',
         serviceType: serviceTypeForAdmin,
         tripType,
-        driverType,
+        driverType: normalizedDriverType,
         duration,
         carType,
         vehicleType,
@@ -411,63 +418,146 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         contentContainerStyle={styles.container}
         ListHeaderComponent={
           <>
-            {/* SERVICE TYPE */}
-            <View style={styles.row}>
+            {/* DRIVER TYPE */}
+            <View style={styles.driverTypeRow}>
               <TouchableOpacity
                 style={[
-                  styles.tab,
-                  serviceType === 'LOCAL_HOURLY' && styles.activeTab
+                  styles.driverButton,
+                  driverType === 'Daily Driver' && styles.driverButtonActive
                 ]}
-                onPress={() => {
-                  setServiceType('LOCAL_HOURLY');
-                  setTripType('One Way');
-                  setDuration('4 Hrs');
-                  resetForm();
-                }}
-            > 
-                <Text style={[styles.tabText, serviceType === 'LOCAL_HOURLY' && styles.activeTabText]}>Local</Text>
+                onPress={() => setDriverType('Daily Driver')}
+              >
+                <Text
+                  style={[
+                    styles.driverTitle,
+                    driverType === 'Daily Driver' && styles.driverTitleActive
+                  ]}
+                >
+                  Standard
+                </Text>
+
+                <Text
+                  style={[
+                    styles.driverSubtitle,
+                    driverType === 'Daily Driver' && styles.driverSubtitleActive
+                  ]}
+                >
+                  Hourly/Daily
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
-                  styles.tab,
-                  serviceType === 'OUTSTATION' && styles.activeTab
+                  styles.driverButton,
+                  driverType === 'Weekly Driver' && styles.driverButtonActive
                 ]}
-                onPress={() => {
-                  setServiceType('OUTSTATION');
-                  setTripType('One Way');
-                  setDuration('8 Hrs'); // ✅ default like web
-                  resetForm();
-                }}
-            > 
-                <Text style={[styles.tabText, serviceType === 'OUTSTATION' && styles.activeTabText]}>Outstation</Text>
+                onPress={() => setDriverType('Weekly Driver')}
+              >
+                <Text
+                  style={[
+                    styles.driverTitle,
+                    driverType === 'Weekly Driver' && styles.driverTitleActive
+                  ]}
+                >
+                  Weekly
+                </Text>
+
+                <Text
+                  style={[
+                    styles.driverSubtitle,
+                    driverType === 'Weekly Driver' && styles.driverSubtitleActive
+                  ]}
+                >
+                  Short Term
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.driverButton,
+                  driverType === 'Monthly Driver' && styles.driverButtonActive
+                ]}
+                onPress={() => setDriverType('Monthly Driver')}
+              >
+                <Text
+                  style={[
+                    styles.driverTitle,
+                    driverType === 'Monthly Driver' && styles.driverTitleActive
+                  ]}
+                >
+                  Monthly
+                </Text>
+
+                <Text
+                  style={[
+                    styles.driverSubtitle,
+                    driverType === 'Monthly Driver' && styles.driverSubtitleActive
+                  ]}
+                >
+                  Long Term
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* TRIP TYPE ONLY FOR LOCAL */}
-            {serviceType === 'LOCAL_HOURLY' && (
+            {driverType === 'Daily Driver' && (
               <View style={styles.row}>
                 <TouchableOpacity
                   style={[
                     styles.tab,
-                    tripType === 'One Way' && styles.activeTab
+                    serviceType === 'LOCAL_HOURLY' && styles.activeTab
                   ]}
-                  onPress={() => setTripType('One Way')}
+                  onPress={() => {
+                    setServiceType('LOCAL_HOURLY');
+                    setTripType('One Way');
+                    setDuration('4 Hrs');
+                    resetForm();
+                  }}
                 >
-                  <Text style={[styles.tabText, tripType === 'One Way' && styles.activeTabText]}>One Way</Text>
+                  <Text style={[styles.tabText, serviceType === 'LOCAL_HOURLY' && styles.activeTabText]}>Local</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.tab,
-                    tripType === 'Round Trip' && styles.activeTab
+                    serviceType === 'OUTSTATION' && styles.activeTab
                   ]}
-                  onPress={() => setTripType('Round Trip')}
+                  onPress={() => {
+                    setServiceType('OUTSTATION');
+                    setTripType('One Way');
+                    setDuration('8 Hrs'); // ✅ default like web
+                    resetForm();
+                  }}
                 >
-                  <Text style={[styles.tabText, tripType === 'Round Trip' && styles.activeTabText]}>Round Trip</Text>
+                  <Text style={[styles.tabText, serviceType === 'OUTSTATION' && styles.activeTabText]}>Outstation</Text>
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* TRIP TYPE ONLY FOR LOCAL */}
+            {driverType === 'Daily Driver' &&
+              serviceType === 'LOCAL_HOURLY' && (
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={[
+                      styles.tab,
+                      tripType === 'One Way' && styles.activeTab
+                    ]}
+                    onPress={() => setTripType('One Way')}
+                  >
+                    <Text style={[styles.tabText, tripType === 'One Way' && styles.activeTabText]}>One Way</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.tab,
+                      tripType === 'Round Trip' && styles.activeTab
+                    ]}
+                    onPress={() => setTripType('Round Trip')}
+                  >
+                    <Text style={[styles.tabText, tripType === 'Round Trip' && styles.activeTabText]}>Round Trip</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
             {/* LOCATION */}
             <View style={{ zIndex: 2 }}>
@@ -597,7 +687,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             {/* SCHEDULE */}
             <Text style={styles.sectionTitle}>Schedule Details</Text>
 
-            {renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver', 'Weekly Driver', 'Monthly Driver'], 'driver', setDriverType)}
+            {renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver'], 'driver', setDriverType)}
             {serviceType === 'OUTSTATION' ? (
               renderDropdown('Select Trip Type', tripType, ['One Way', 'Round Trip'], 'tripTypeDropdown', setTripType)
             ) : (
@@ -779,6 +869,49 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 },
 
   row: { flexDirection: 'row', gap: 10, marginBottom: 15 },
+
+  driverTypeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+
+  driverButton: {
+    flex: 1,
+    marginHorizontal: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+
+  driverButtonActive: {
+    backgroundColor: '#000',
+    borderColor: '#000',
+  },
+
+  driverTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#222',
+  },
+
+  driverTitleActive: {
+    color: '#fff',
+  },
+
+  driverSubtitle: {
+    fontSize: 10,
+    color: '#777',
+    marginTop: 2,
+  },
+
+  driverSubtitleActive: {
+    color: '#ddd',
+  },
 
   tab: {
     flex: 1,
