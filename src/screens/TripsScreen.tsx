@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Linking, Image, ScrollView, Alert, TextInput } from 'react-native';
 import { getMyTrips, cancelTrip, rateTrip } from '../api/tripApi';
+import { useAuth } from '../context/AuthContext';
 
 const TripsScreen = () => {
+  const { userToken } = useAuth();
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDriverModal, setShowDriverModal] = useState(false);
@@ -18,8 +20,14 @@ const TripsScreen = () => {
   }>({});
 
   useEffect(() => {
+    if (!userToken) {
+      setTrips([]);
+      setLoading(false);
+      return;
+    }
+
     loadTrips();
-  }, []);
+  }, [userToken]);
 
   const normalizeStatus = (status: any) => String(status ?? '').trim().toUpperCase().replace(/\s+/g, '_');
 
@@ -27,7 +35,15 @@ const TripsScreen = () => {
     setLoading(true);
     const res = await getMyTrips();
 
-    const allBookings = res.bookings || [];
+    const rawBookings = Array.isArray(res?.bookings)
+      ? res.bookings
+      : Array.isArray(res?.data?.bookings)
+      ? res.data.bookings
+      : Array.isArray(res?.data)
+      ? res.data
+      : [];
+
+    const allBookings = rawBookings;
 
     const processedTrips = allBookings.map((trip: any) => {
       const normalizedStatus = normalizeStatus(trip.status);
