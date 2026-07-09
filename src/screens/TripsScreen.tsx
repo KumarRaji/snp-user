@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Linking, Image, ScrollView } from 'react-native';
-import { getMyTrips } from '../api/tripApi';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Linking, Image, ScrollView, Alert, TextInput } from 'react-native';
+import { getMyTrips, cancelTrip, rateTrip } from '../api/tripApi';
 
 const TripsScreen = () => {
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [ratingData, setRatingData] = useState<{
+    [key: string]: {
+      rating: number;
+      feedback: string;
+    };
+  }>({});
 
   useEffect(() => {
     loadTrips();
@@ -37,6 +46,68 @@ const TripsScreen = () => {
     setLoading(false);
   };
 
+  const confirmCancelTrip = async () => {
+    if (!selectedBookingId) return;
+
+    try {
+      setCancelLoading(true);
+
+      const res = await cancelTrip(selectedBookingId);
+
+      if (res.success) {
+        setShowCancelModal(false);
+        setSelectedBookingId(null);
+        await loadTrips();
+
+        Alert.alert(
+          'Success',
+          'Cancellation request sent to Admin for approval'
+        );
+      } else {
+        Alert.alert('Error', 'Unable to cancel booking');
+      }
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const handleRating = (tripId: string, rating: number) => {
+    setRatingData(prev => ({
+      ...prev,
+      [tripId]: {
+        rating,
+        feedback: prev[tripId]?.feedback || '',
+      },
+    }));
+  };
+
+  const submitRating = async (tripId: string) => {
+    const data = ratingData[tripId];
+
+    if (!data?.rating) {
+      Alert.alert('Please select rating');
+      return;
+    }
+
+    console.log('Submitting rating payload', {
+      rating: data.rating,
+      feedback: data.feedback,
+    });
+
+    try {
+      const response = await rateTrip(tripId, data.rating, data.feedback);
+
+      if (response.success) {
+        Alert.alert('Success', response.message || 'Rating submitted successfully');
+        await loadTrips();
+      } else {
+        Alert.alert('Error', response.message || 'Something went wrong');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Something went wrong');
+    }
+  };
+
   const renderItem = ({ item }: any) => {
     const d = new Date(item.startDateTime || item.createdAt || Date.now());
     const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -50,6 +121,18 @@ const TripsScreen = () => {
     const isPending = item.status === 'PENDING';
     const isCompleted = item.status === 'COMPLETED';
     const isAllocated = item.status === 'DRIVER_ALLOCATED';
+    const isCancellationPending = item.cancellationRequested;
+    const existingRating = Number(item.rating ?? item.userRating ?? 0) || 0;
+
+    const statusText = isCompleted
+      ? 'COMPLETED'
+      : assignedPerson
+      ? (isLead ? 'LEAD ALLOCATED' : 'DRIVER ALLOCATED')
+      : item.selectedLeadPackageId
+      ? 'REQUEST SENT TO LEADS'
+      : item.status === 'CONFIRMED'
+      ? 'CONFIRMED'
+      : item.status;
 
     return (
       <View style={styles.card}>
@@ -57,28 +140,42 @@ const TripsScreen = () => {
         <View style={styles.header}>
           <Text style={styles.date}>{dateStr}</Text>
 
-          <View style={[
-            styles.badge, 
-            isPending && styles.badgePending,
-            isAllocated && styles.badgeAllocated,
-            isCompleted && styles.badgeCompleted
-          ]}>
-            <Text style={[
-              styles.badgeText, 
-              isPending && styles.badgeTextPending,
-              isAllocated && styles.badgeTextAllocated,
-              isCompleted && styles.badgeTextCompleted
-            ]}>
-              {isCompleted
-                ? 'COMPLETED'
-                : assignedPerson
-                ? (isLead ? 'LEAD ALLOCATED' : 'DRIVER ALLOCATED')
-                : item.selectedLeadPackageId
-                ? 'REQUEST SENT TO LEADS'
-                : item.status === 'CONFIRMED'
-                ? 'CONFIRMED'
-                : item.status}
-            </Text>
+          <View style={styles.headerRight}>
+            {isCancellationPending ? (
+              <View style={styles.cancelPendingBadge}>
+                <Text style={styles.cancelPendingText}>CANCELLATION PENDING</Text>
+              </View>
+            ) : (
+              <View style={[
+                styles.badge,
+                isPending && styles.badgePending,
+                isAllocated && styles.badgeAllocated,
+                isCompleted && styles.badgeCompleted
+              ]}>
+                <Text style={[
+                  styles.badgeText,
+                  isPending && styles.badgeTextPending,
+                  isAllocated && styles.badgeTextAllocated,
+                  isCompleted && styles.badgeTextCompleted
+                ]}>
+                  {statusText}
+                </Text>
+              </View>
+            )}
+
+            {!isCompleted &&
+              !isCancellationPending &&
+              ['PENDING', 'CONFIRMED', 'DRIVER_ALLOCATED'].includes(item.status) && (
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => {
+                    setSelectedBookingId(item.id);
+                    setShowCancelModal(true);
+                  }}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel Trip</Text>
+                </TouchableOpacity>
+              )}
           </View>
         </View>
 
@@ -190,6 +287,86 @@ const TripsScreen = () => {
             </View>
           )
         ) : null}
+
+        {item.status === 'COMPLETED' && (
+          <View style={styles.ratingContainer}>
+            {existingRating > 0 ? (
+              <View>
+                <View style={styles.ratingHeader}>
+                  <Text style={styles.ratingTitle}>Your Rating:</Text>
+                  <View style={styles.ratingStars}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Text
+                        key={star}
+                        style={{
+                          fontSize: 18,
+                          color: star <= existingRating ? '#FBBF24' : '#D1D5DB',
+                        }}
+                      >
+                        ★
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+
+                {!!item.feedback && (
+                  <Text style={styles.feedbackText}>
+                    "{item.feedback}"
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <>
+                <Text style={styles.ratingTitle}>Rate your driver:</Text>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleRating(item.id, star)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 32,
+                          color: (ratingData[item.id]?.rating || 0) >= star ? '#FBBF24' : '#D1D5DB',
+                        }}
+                      >
+                        ★
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {ratingData[item.id]?.rating > 0 && (
+                  <>
+                    <TextInput
+                      placeholder="How was your trip? (Optional)"
+                      value={ratingData[item.id]?.feedback}
+                      multiline
+                      numberOfLines={3}
+                      style={styles.feedbackInput}
+                      onChangeText={(text) => {
+                        setRatingData(prev => ({
+                          ...prev,
+                          [item.id]: {
+                            ...prev[item.id],
+                            feedback: text,
+                          },
+                        }));
+                      }}
+                    />
+
+                    <TouchableOpacity
+                      style={styles.submitButton}
+                      onPress={() => submitRating(item.id)}
+                    >
+                      <Text style={styles.submitText}>Submit Rating</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            )}
+          </View>
+        )}
       </View>
     );
   };
@@ -220,6 +397,44 @@ const TripsScreen = () => {
           </Text>
         }
       />
+
+      <Modal
+        visible={showCancelModal}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.cancelModal}>
+            <View style={styles.cancelIcon}>
+              <Text style={{ fontSize: 24, color: '#ef4444' }}>✕</Text>
+            </View>
+
+            <Text style={styles.cancelTitle}>Cancel Booking?</Text>
+            <Text style={styles.cancelSubtitle}>
+              Are you sure?{'\n'}This request will be sent to the{'\n'}Admin for approval.
+            </Text>
+
+            <View style={styles.cancelFooter}>
+              <TouchableOpacity
+                style={styles.keepBtn}
+                onPress={() => setShowCancelModal(false)}
+              >
+                <Text style={styles.keepText}>Keep It</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelConfirmBtn}
+                onPress={confirmCancelTrip}
+                disabled={cancelLoading}
+              >
+                <Text style={styles.cancelConfirmText}>
+                  {cancelLoading ? 'Cancelling...' : 'Yes, Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showDriverModal}
@@ -362,6 +577,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
 
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+
   badge: {
     backgroundColor: '#e6f4fe',
     paddingHorizontal: 8,
@@ -397,6 +616,37 @@ const styles = StyleSheet.create({
 
   badgeTextCompleted: {
     color: '#475569'
+  },
+
+  cancelBtn: {
+    marginTop: 8,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  cancelBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 10,
+  },
+
+  cancelPendingBadge: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  cancelPendingText: {
+    color: '#EA580C',
+    fontSize: 10,
+    fontWeight: '700',
   },
 
   amount: {
@@ -512,11 +762,124 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
 
+  ratingContainer: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  ratingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  ratingTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 0,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    marginLeft: 6,
+  },
+  starRow: {
+    flexDirection: 'row',
+  },
+  feedbackInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    marginTop: 15,
+    padding: 12,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    backgroundColor: '#FFF',
+  },
+  submitButton: {
+    backgroundColor: '#000',
+    marginTop: 15,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  submitText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  feedbackText: {
+    marginTop: 2,
+    color: '#6B7280',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: 20
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  cancelModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '82%',
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  cancelIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FEE2E2',
+    alignSelf: 'center',
+    marginTop: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  cancelSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 18,
+    lineHeight: 18,
+  },
+  cancelFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    marginTop: 18,
+  },
+  keepBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  cancelConfirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  keepText: {
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  cancelConfirmText: {
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#DC2626',
   },
   modalContainer: {
     backgroundColor: '#fff',
