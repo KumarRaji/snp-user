@@ -21,6 +21,8 @@ const TripsScreen = () => {
     loadTrips();
   }, []);
 
+  const normalizeStatus = (status: any) => String(status ?? '').trim().toUpperCase().replace(/\s+/g, '_');
+
   const loadTrips = async () => {
     setLoading(true);
     const res = await getMyTrips();
@@ -28,18 +30,19 @@ const TripsScreen = () => {
     const allBookings = res.bookings || [];
 
     const processedTrips = allBookings.map((trip: any) => {
-      const allocatedStatuses = ['DRIVER_ALLOCATED', 'DRIVER ALLOCATED', 'ACCEPTED', 'ARRIVED', 'STARTED', 'ON_TRIP'];
-      if (allocatedStatuses.includes(trip.status)) {
+      const normalizedStatus = normalizeStatus(trip.status);
+      const allocatedStatuses = ['DRIVER_ALLOCATED', 'DRIVER_ALLOCATED', 'ACCEPTED', 'ARRIVED', 'STARTED', 'ON_TRIP'];
+      if (allocatedStatuses.includes(normalizedStatus)) {
         // Normalize status to DRIVER_ALLOCATED to group them
         return { ...trip, status: 'DRIVER_ALLOCATED' };
       }
-      return trip;
+      return { ...trip, status: normalizedStatus || trip.status };
     });
 
-    // Only show trips with one of the 4 main statuses
-    const validStatuses = ['PENDING', 'CONFIRMED', 'DRIVER_ALLOCATED', 'COMPLETED'];
+    // Only show trips with one of the supported statuses
+    const validStatuses = ['PENDING', 'CONFIRMED', 'DRIVER_ALLOCATED', 'COMPLETED', 'CANCELLED'];
     const filteredTrips = processedTrips.filter((trip: any) =>
-      validStatuses.includes(trip.status)
+      validStatuses.includes(normalizeStatus(trip.status))
     );
 
     setTrips(filteredTrips);
@@ -117,14 +120,19 @@ const TripsScreen = () => {
     const assignedPerson = item.driver || item.lead;
     const isLead = !!item.lead;
 
+    const normalizedStatus = normalizeStatus(item.status);
+
     // Status checks
-    const isPending = item.status === 'PENDING';
-    const isCompleted = item.status === 'COMPLETED';
-    const isAllocated = item.status === 'DRIVER_ALLOCATED';
+    const isPending = normalizedStatus === 'PENDING';
+    const isCompleted = normalizedStatus === 'COMPLETED';
+    const isAllocated = normalizedStatus === 'DRIVER_ALLOCATED';
+    const isCancelled = normalizedStatus === 'CANCELLED';
     const isCancellationPending = item.cancellationRequested;
     const existingRating = Number(item.rating ?? item.userRating ?? 0) || 0;
 
-    const statusText = isCompleted
+    const statusText = isCancelled
+      ? 'CANCELLED'
+      : isCompleted
       ? 'COMPLETED'
       : assignedPerson
       ? (isLead ? 'LEAD ALLOCATED' : 'DRIVER ALLOCATED')
@@ -150,13 +158,15 @@ const TripsScreen = () => {
                 styles.badge,
                 isPending && styles.badgePending,
                 isAllocated && styles.badgeAllocated,
-                isCompleted && styles.badgeCompleted
+                isCompleted && styles.badgeCompleted,
+                isCancelled && styles.badgeCancelled
               ]}>
                 <Text style={[
                   styles.badgeText,
                   isPending && styles.badgeTextPending,
                   isAllocated && styles.badgeTextAllocated,
-                  isCompleted && styles.badgeTextCompleted
+                  isCompleted && styles.badgeTextCompleted,
+                  isCancelled && styles.badgeTextCancelled
                 ]}>
                   {statusText}
                 </Text>
@@ -600,6 +610,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0'
   },
 
+  badgeCancelled: {
+    backgroundColor: '#FEE2E2'
+  },
+
   badgeText: {
     fontSize: 10,
     color: '#0066cc',
@@ -616,6 +630,10 @@ const styles = StyleSheet.create({
 
   badgeTextCompleted: {
     color: '#475569'
+  },
+
+  badgeTextCancelled: {
+    color: '#DC2626'
   },
 
   cancelBtn: {
