@@ -20,6 +20,15 @@ export const updateProfile = async (profileData: any) => {
   }
 };
 
+export const deleteAccount = async () => {
+  try {
+    await apiClient.delete('https://drivemate.api.luisant.cloud/api/auth/delete');
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+};
+
 export const logout = async () => {
   try {
     await apiClient.post('/auth/logout');

@@ -12,10 +12,12 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
-import { updateProfile } from '../api/authApi';
+import { updateProfile, deleteAccount } from '../api/authApi';
 import { uploadFile } from '../api/uploadApi';
+import { useAuth } from '../context/AuthContext';
 
 const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
+  const { logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -236,6 +238,33 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
       {!isEditing ? (
         <>
           <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() =>
+              Alert.alert(
+                'Delete Account',
+                'Are you sure? This action cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const res = await deleteAccount();
+                      if (res.success) {
+                        await logout();
+                      } else {
+                        Alert.alert('Error', 'Failed to delete account');
+                      }
+                    },
+                  },
+                ]
+              )
+            }
+          >
+            <Text style={styles.deleteText}>Delete Account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.editBtn}
             onPress={() => setIsEditing(true)}
           >
@@ -351,6 +380,22 @@ const styles = StyleSheet.create({
   editText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+
+  deleteBtn: {
+    marginTop: 20,
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#e53935',
+  },
+
+  deleteText: {
+    color: '#e53935',
+    fontSize: 12,
   },
 
   row: {
