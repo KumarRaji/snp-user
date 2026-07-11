@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -20,6 +21,11 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
   const { logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState({ visible: false, title: '', message: '', type: 'error' as 'success' | 'error' | 'warning' | 'info' });
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'error') =>
+    setAlert({ visible: true, title, message, type });
 
   const [form, setForm] = useState({
     name: profile?.name || '',
@@ -63,7 +69,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
 
         setFileName(file.name);
       } catch (error) {
-        Alert.alert('Error', 'File upload failed');
+        showAlert('Error', 'File upload failed');
       } finally {
         setLoading(false);
       }
@@ -75,7 +81,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      showAlert('Permission Required', 'Camera access is needed to take photos.', 'warning');
       return;
     }
 
@@ -105,7 +111,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
 
         setFileName(file.name);
       } catch (error) {
-        Alert.alert('Error', 'File upload failed');
+        showAlert('Error', 'File upload failed');
       } finally {
         setLoading(false);
       }
@@ -133,13 +139,13 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           await onProfileUpdate();
         }
 
-        Alert.alert('Success', 'Profile updated');
+        showAlert('Success', 'Profile updated', 'success');
         setIsEditing(false);
       } else {
-        Alert.alert('Error', res.message || 'Failed to update profile');
+        showAlert('Error', res.message || 'Failed to update profile');
       }
     } catch (e) {
-      Alert.alert('Error', 'Something went wrong');
+      showAlert('Error', 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -239,27 +245,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
         <>
           <TouchableOpacity
             style={styles.deleteBtn}
-            onPress={() =>
-              Alert.alert(
-                'Delete Account',
-                'Are you sure? This action cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                      const res = await deleteAccount();
-                      if (res.success) {
-                        await logout();
-                      } else {
-                        Alert.alert('Error', 'Failed to delete account');
-                      }
-                    },
-                  },
-                ]
-              )
-            }
+            onPress={() => setDeleteVisible(true)}
           >
             <Text style={styles.deleteText}>Delete Account</Text>
           </TouchableOpacity>
@@ -289,6 +275,33 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           </TouchableOpacity>
         </View>
       )}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        onConfirm={() => setAlert(prev => ({ ...prev, visible: false }))}
+      />
+
+      <CustomAlert
+        visible={deleteVisible}
+        title="Delete Account"
+        message="Are you sure you want to delete your account? This action cannot be undone."
+        type="warning"
+        showCancel
+        cancelText="Cancel"
+        confirmText="Delete"
+        onCancel={() => setDeleteVisible(false)}
+        onConfirm={async () => {
+          setDeleteVisible(false);
+          const res = await deleteAccount();
+          if (res.success) {
+            await logout();
+          } else {
+            showAlert('Error', 'Failed to delete account');
+          }
+        }}
+      />
     </View>
   );
 };

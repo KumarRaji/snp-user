@@ -8,6 +8,7 @@ import ProfileScreen from './ProfileScreen';
 import CompleteProfileModal from './CompleteProfileModal';
 import { getProfile } from '../api/authApi';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../components/CustomAlert';
 
 const HomeScreen = ({ navigation }: any) => {
   const { logout } = useAuth();
@@ -15,6 +16,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [profile, setProfile] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   useEffect(() => {
@@ -110,11 +112,23 @@ const HomeScreen = ({ navigation }: any) => {
             {/* This overlay will catch any clicks outside the logout menu and close it. */}
             <View style={[StyleSheet.absoluteFill, { zIndex: 990 }]} />
           </TouchableWithoutFeedback>
-          <TouchableOpacity style={styles.logoutMenu} onPress={handleLogout}>
+          <TouchableOpacity style={styles.logoutMenu} onPress={() => { setShowLogoutMenu(false); setLogoutVisible(true); }}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </>
       )}
+
+      <CustomAlert
+        visible={logoutVisible}
+        title="Logout"
+        message="Are you sure you want to logout?"
+        type="warning"
+        showCancel
+        cancelText="Cancel"
+        confirmText="Logout"
+        onCancel={() => setLogoutVisible(false)}
+        onConfirm={handleLogout}
+      />
 
       <CompleteProfileModal 
         visible={showModal} 
