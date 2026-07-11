@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
 import * as DocumentPicker from 'expo-document-picker';
@@ -37,7 +38,6 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
 
   const [fileName, setFileName] = useState('');
 
-  // Keep form in sync when the profile prop updates
   useEffect(() => {
     if (profile) {
       setForm({
@@ -50,23 +50,14 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
     }
   }, [profile]);
 
-  // 📁 Upload ID Proof
   const handlePickFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({});
-
     if (!result.canceled) {
       const file = result.assets[0];
-
       try {
         setLoading(true);
-
         const res = await uploadFile(file);
-
-        setForm(prev => ({
-          ...prev,
-          idProof: res.fileId || res.url,
-        }));
-
+        setForm(prev => ({ ...prev, idProof: res.fileId || res.url }));
         setFileName(file.name);
       } catch (error) {
         showAlert('Error', 'File upload failed');
@@ -76,20 +67,13 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
     }
   };
 
-  // 📷 Take Photo using Camera
   const handleTakePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
     if (!permissionResult.granted) {
       showAlert('Permission Required', 'Camera access is needed to take photos.', 'warning');
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7,
-    });
-
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
     if (!result.canceled) {
       const asset = result.assets[0];
       const file = {
@@ -98,17 +82,10 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
         mimeType: asset.mimeType || 'image/jpeg',
         size: asset.fileSize,
       };
-
       try {
         setLoading(true);
-
         const res = await uploadFile(file);
-
-        setForm(prev => ({
-          ...prev,
-          idProof: res.fileId || res.url,
-        }));
-
+        setForm(prev => ({ ...prev, idProof: res.fileId || res.url }));
         setFileName(file.name);
       } catch (error) {
         showAlert('Error', 'File upload failed');
@@ -126,19 +103,12 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
     ]);
   };
 
-  //  Save Profile
   const handleSave = async () => {
     try {
       setLoading(true);
-
       const res = await updateProfile(form);
-
       if (res.success) {
-        // Refresh parent component which will update AsyncStorage and profile state
-        if (onProfileUpdate) {
-          await onProfileUpdate();
-        }
-
+        if (onProfileUpdate) await onProfileUpdate();
         showAlert('Success', 'Profile updated', 'success');
         setIsEditing(false);
       } else {
@@ -154,7 +124,8 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
   if (!profile) return <Text style={styles.loading}>Loading profile...</Text>;
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
+
       {/* Avatar */}
       <View style={styles.avatarContainer}>
         <Text style={styles.avatarText}>
@@ -168,27 +139,28 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           <Text style={styles.name}>{form.name}</Text>
           <Text style={styles.info}>{form.phone}</Text>
           <Text style={styles.info}>{form.email}</Text>
+
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => setDeleteVisible(true)}
+          >
+            <Text style={styles.deleteText}>Delete Account</Text>
+          </TouchableOpacity>
         </>
       ) : (
         <>
           <TextInput
             style={styles.input}
             value={form.name}
-            onChangeText={(t) =>
-              setForm((prev) => ({ ...prev, name: t }))
-            }
+            onChangeText={(t) => setForm((prev) => ({ ...prev, name: t }))}
             placeholder="Name"
           />
-
           <TextInput
             style={styles.input}
             value={form.email}
-            onChangeText={(t) =>
-              setForm((prev) => ({ ...prev, email: t }))
-            }
+            onChangeText={(t) => setForm((prev) => ({ ...prev, email: t }))}
             placeholder="Email"
           />
-
           <TextInput
             style={styles.input}
             value={form.phone}
@@ -200,7 +172,6 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
       {/* ADDRESS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Address</Text>
-
         {!isEditing ? (
           <Text style={styles.sectionContent}>
             {form.address || 'No address provided'}
@@ -209,9 +180,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           <TextInput
             style={styles.input}
             value={form.address}
-            onChangeText={(t) =>
-              setForm((prev) => ({ ...prev, address: t }))
-            }
+            onChangeText={(t) => setForm((prev) => ({ ...prev, address: t }))}
             placeholder="Enter address"
           />
         )}
@@ -220,7 +189,6 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
       {/* ID PROOF */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ID Proof</Text>
-
         {!isEditing ? (
           form.idProof ? (
             <Image source={{ uri: form.idProof }} style={styles.idProofImage} resizeMode="contain" />
@@ -232,49 +200,27 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
             <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadChoice}>
               <Text>{fileName ? fileName : (form.idProof ? 'Replace Uploaded File' : 'Choose File')}</Text>
             </TouchableOpacity>
-
-            <Text style={styles.helper}>
-              Aadhaar / Voter ID / Passport
-            </Text>
+            <Text style={styles.helper}>Aadhaar / Voter ID / Passport</Text>
           </>
         )}
       </View>
 
-      {/* BUTTONS */}
+      {/* SAVE / CANCEL */}
       {!isEditing ? (
-        <>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => setDeleteVisible(true)}
-          >
-            <Text style={styles.deleteText}>Delete Account</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => setIsEditing(true)}
-          >
-            <Text style={styles.editText}>Edit Profile</Text>
-          </TouchableOpacity>
-        </>
+        <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}>
+          <Text style={styles.editText}>Edit Profile</Text>
+        </TouchableOpacity>
       ) : (
         <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={() => setIsEditing(false)}
-          >
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsEditing(false)}>
             <Text>Cancel</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={{ color: '#fff' }}>Save</Text>
-            )}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff' }}>Save</Text>}
           </TouchableOpacity>
         </View>
       )}
+
       <CustomAlert
         visible={alert.visible}
         title={alert.title}
@@ -302,13 +248,18 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           }
         }}
       />
-    </View>
+    </ScrollView>
   );
 };
 
 export default ProfileScreen;
+
 const styles = StyleSheet.create({
-  container: { padding: 20, alignItems: 'center' },
+  container: {
+    padding: 20,
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
 
   loading: { textAlign: 'center', marginTop: 50 },
 
@@ -328,9 +279,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  editBtn: {
+    marginTop: 20,
+    backgroundColor: '#000',
+    padding: 15,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+
+  editText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+
   name: { fontSize: 22, fontWeight: 'bold', marginBottom: 5 },
 
   info: { fontSize: 14, color: '#666', marginBottom: 5 },
+
+  deleteBtn: {
+    marginTop: 12,
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#e53935',
+    shadowColor: '#e53935',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  deleteText: {
+    color: '#e53935',
+    fontSize: 12,
+  },
 
   section: {
     width: '100%',
@@ -379,36 +365,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 5,
-  },
-
-  editBtn: {
-    marginTop: 20,
-    backgroundColor: '#000',
-    padding: 15,
-    borderRadius: 10,
-    width: '100%',
-    alignItems: 'center',
-  },
-
-  editText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-
-  deleteBtn: {
-    marginTop: 20,
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: '#e53935',
-  },
-
-  deleteText: {
-    color: '#e53935',
-    fontSize: 12,
   },
 
   row: {
