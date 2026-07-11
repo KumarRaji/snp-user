@@ -20,6 +20,7 @@ import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplet
 import DateTimePicker from '@react-native-community/datetimepicker';
 import TermsAndConditionsModal from './TermsAndConditionsModal';
 import { Ionicons } from '@expo/vector-icons';
+import CustomAlert from '../components/CustomAlert';
 
 // for example, using environment variables, and not to hardcode it.
 // Make sure this key has "Directions API", "Places API", and "Maps SDK for Android/iOS" enabled in your Google Cloud Console.
@@ -68,6 +69,11 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const [showChargesModal, setShowChargesModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [alert, setAlert] = useState({ visible: false, title: '', message: '', type: 'error' as 'success' | 'error' | 'warning' | 'info' });
+  const [bookingSuccessVisible, setBookingSuccessVisible] = useState(false);
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'error') =>
+    setAlert({ visible: true, title, message, type });
 
   const fromRef = useRef<any>(null);
   const toRef = useRef<any>(null);
@@ -152,7 +158,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
           extraPerHour: 100
         };
         if (packageType === 'OUTSTATION' && data.success === false) {
-          Alert.alert("Estimate Error", "Could not fetch estimate for the selected route.");
+          showAlert('Estimate Error', 'Could not fetch estimate for the selected route.', 'warning');
         }
       }
 
@@ -198,22 +204,22 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     setShowPaymentModal(false);
 
     if (!from.description || (showDropLocation && !to.description)) {
-      Alert.alert('Required', 'Enter locations');
+      showAlert('Required', 'Please enter pickup and drop locations.', 'warning');
       return;
     }
 
     if (!from.description.includes(',')) {
-      Alert.alert('Invalid', 'Select proper pickup location');
+      showAlert('Invalid', 'Please select a proper pickup location.', 'warning');
       return;
     }
 
     if (showDropLocation && !to.description.includes(',')) {
-      Alert.alert('Invalid', 'Select proper drop location');
+      showAlert('Invalid', 'Please select a proper drop location.', 'warning');
       return;
     }
 
     if (!agree) {
-      Alert.alert('Terms', 'Please accept terms & conditions');
+      showAlert('Terms', 'Please accept the terms & conditions.', 'warning');
       return;
     }
 
@@ -262,15 +268,12 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       });
 
       if (res.success) {
-        Alert.alert('Success', 'Booking request sent to drivers!');
-        if (onBookingSuccess) {
-          onBookingSuccess();
-        }
+        setBookingSuccessVisible(true);
       } else {
-        Alert.alert('Error', 'Failed');
+        showAlert('Error', 'Booking failed. Please try again.');
       }
     } catch (e) {
-      Alert.alert('Error', 'Something went wrong');
+      showAlert('Error', 'Something went wrong. Please try again.');
     }
 
     setLoading(false);
@@ -282,7 +285,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied');
+        showAlert('Permission Denied', 'Location permission is required to use this feature.', 'warning');
         return;
       }
 
@@ -309,7 +312,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         fromRef.current?.setAddressText(formatted);
       }
     } catch {
-      Alert.alert('Error fetching location');
+      showAlert('Error', 'Could not fetch your current location.');
     } finally {
       setLoading(false);
     }
@@ -567,7 +570,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                 fetchDetails={true}
                 onPress={(data, details = null) => {
                   if (!details?.geometry?.location) {
-                    Alert.alert('Error', 'Could not get location coordinates. Ensure Places API is enabled.');
+                    showAlert('Error', 'Could not get location coordinates.');
                   }
                   setFrom({ description: data.description, location: details?.geometry?.location || null })
                 }}
@@ -599,7 +602,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   fetchDetails={true}
                   onPress={(data, details = null) => {
                     if (!details?.geometry?.location) {
-                      Alert.alert('Error', 'Could not get location coordinates. Ensure Places API is enabled.');
+                      showAlert('Error', 'Could not get location coordinates.');
                     }
                     setTo({ description: data.description, location: details?.geometry?.location || null })
                   }}
@@ -676,7 +679,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                       }}
                       onError={(error) => {
                         console.log('MapViewDirections Error:', error);
-                        Alert.alert('Directions Error', 'Could not draw the route. The API key might be invalid or the locations are not reachable by car.');
+                        showAlert('Directions Error', 'Could not draw the route. Please check your locations.');
                       }}
                     />
                   )}
@@ -834,6 +837,26 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
           </View>
         </View>
       )}
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        onConfirm={() => setAlert(prev => ({ ...prev, visible: false }))}
+      />
+
+      <CustomAlert
+        visible={bookingSuccessVisible}
+        title="Booking Confirmed!"
+        message="Your booking request has been sent to drivers."
+        type="success"
+        confirmText="View Trips"
+        onConfirm={() => {
+          setBookingSuccessVisible(false);
+          if (onBookingSuccess) onBookingSuccess();
+        }}
+      />
 
       <TermsAndConditionsModal
         isOpen={showTerms}

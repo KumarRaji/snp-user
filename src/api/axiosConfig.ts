@@ -21,7 +21,10 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Let the UI handle the 401 redirect to avoid circular dependencies in RN
+    if (error.response?.status === 401) {
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('profile');
+    }
     return Promise.reject(error);
   }
 );

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { sendOTP, verifyOTP } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../components/CustomAlert';
 
 const LoginScreen = () => {
   const [step, setStep] = useState<'PHONE' | 'OTP'>('PHONE');
@@ -20,6 +21,10 @@ const LoginScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState({ visible: false, title: '', message: '', type: 'error' as 'success' | 'error' | 'warning' | 'info' });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'error') =>
+    setAlert({ visible: true, title, message, type });
 
   useEffect(() => {
     if (step === 'PHONE' && Platform.OS === 'android') {
@@ -74,7 +79,7 @@ const LoginScreen = () => {
 
   const handleSendOtp = async () => {
     if (phoneNumber.length < 10) {
-      alert('Enter valid number');
+      showAlert('Invalid Number', 'Please enter a valid 10-digit phone number.', 'warning');
       return;
     }
 
@@ -86,14 +91,14 @@ const LoginScreen = () => {
       }
     } catch (error) {
       console.log(error);
-      alert('Error sending OTP');
+      showAlert('Error', 'Error sending OTP. Please try again.');
     }
     setLoading(false);
   };
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) {
-      alert('Invalid OTP');
+      showAlert('Invalid OTP', 'Please enter the 6-digit OTP sent to your number.', 'warning');
       return;
     }
 
@@ -103,10 +108,12 @@ const LoginScreen = () => {
 
       if (res.success) {
         await login(res.token);
+      } else {
+        showAlert('Incorrect OTP', 'The OTP you entered is incorrect. Please try again.', 'error');
       }
     } catch (error) {
       console.log(error);
-      alert('Error verifying OTP');
+      showAlert('Error', 'Error verifying OTP. Please try again.');
     }
     setLoading(false);
   };
@@ -225,6 +232,13 @@ const LoginScreen = () => {
           )}
         </View>
       </View>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        onConfirm={() => setAlert(prev => ({ ...prev, visible: false }))}
+      />
     </ImageBackground>
   );
 };
