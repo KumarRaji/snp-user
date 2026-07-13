@@ -263,6 +263,17 @@ const TripsScreen = () => {
                 <Text style={styles.driverPhone}>
                   {assignedPerson?.phone || 'N/A'}
                 </Text>
+                {Number(assignedPerson?.rating || 0) > 0 && (
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.ratingValue}>
+                      {Number(assignedPerson.rating).toFixed(1)}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#FBBF24', marginHorizontal: 3 }}>★</Text>
+                    <Text style={styles.rideCount}>
+                      ({assignedPerson.totalRides || 0} rides)
+                    </Text>
+                  </View>
+                )}
               </View>
             
               {/* 📞 CALL BUTTON */}
@@ -775,6 +786,9 @@ const styles = StyleSheet.create({
   driverAvatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   driverName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   driverPhone: { fontSize: 14, color: '#666' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  ratingValue: { fontSize: 12, fontWeight: '700', color: '#333' },
+  rideCount: { fontSize: 11, color: '#777' },
 
   callButton: {
     backgroundColor: '#16a34a',
