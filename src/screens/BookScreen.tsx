@@ -238,33 +238,34 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         startDateTimeObj.setHours(hrs, parseInt(minutes, 10), 0, 0);
       }
 
-      // Map internal serviceType to admin-friendly label (match web)
-      const serviceTypeForAdmin =
-        serviceType === 'LOCAL_HOURLY' ? 'Local - Hourly' :
-        serviceType === 'OUTSTATION' ? 'Outstation' : serviceType;
-
       const normalizedDriverType =
-        driverType === 'Daily Driver' ||
-        driverType === 'Weekly Driver' ||
-        driverType === 'Monthly Driver'
+        driverType === 'Daily Driver'
           ? 'Acting Driver'
           : driverType;
+
+      console.log('Booking Payload', {
+        pickupLocation: from.description,
+        dropLocation: showDropLocation ? to.description : '',
+        serviceType,
+        tripType,
+        driverType: normalizedDriverType,
+        duration,
+        estimateAmount: estimate,
+        paymentMethod,
+      });
 
       const res = await createTrip({
         pickupLocation: from.description,
         dropLocation: showDropLocation ? to.description : '',
-        serviceType: serviceTypeForAdmin,
+        serviceType,
         tripType,
         driverType: normalizedDriverType,
         duration,
         carType,
         vehicleType,
         estimateAmount: estimate,
-
-        // ✅ FIXED DATE TIME
         startDateTime: startDateTimeObj.toISOString(),
-
-        paymentMethod: paymentMethod
+        paymentMethod,
       });
 
       if (res.success) {
