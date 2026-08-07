@@ -4,8 +4,7 @@ export const getProfile = async () => {
   try {
     const response = await apiClient.get('https://drivemate.api.luisant.cloud/api/auth/profile');
     return response.data;
-  } catch (error) {
-    console.log('Error fetching profile:', error);
+  } catch {
     return null;
   }
 };
@@ -15,7 +14,6 @@ export const updateProfile = async (profileData: any) => {
     const response = await apiClient.put('https://drivemate.api.luisant.cloud/api/auth/profile', profileData);
     return { success: true, ...response.data };
   } catch (error: any) {
-    console.log('Update profile error:', error.response?.data || error.message);
     return { success: false, message: error.response?.data?.message || 'Network error' };
   }
 };

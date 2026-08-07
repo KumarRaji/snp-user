@@ -183,8 +183,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
       setEstimate(finalEstimate);
       setPricing(finalPricing);
-    } catch (e) {
-      console.log('Estimate error', e);
+    } catch {
       setEstimate(null);
       setPricing(null);
     } finally {
@@ -261,17 +260,6 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         driverType === 'Daily Driver'
           ? 'Acting Driver'
           : driverType;
-
-      console.log('Booking Payload', {
-        pickupLocation: from.description,
-        dropLocation: showDropLocation ? to.description : '',
-        serviceType,
-        tripType,
-        driverType: normalizedDriverType,
-        duration,
-        estimateAmount: estimate,
-        paymentMethod,
-      });
 
       const res = await createTrip({
         pickupLocation: from.description,
@@ -594,7 +582,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   }
                   setFrom({ description: data.description, location: details?.geometry?.location || null })
                 }}
-                onFail={(error) => console.log('Places Error:', error)}
+                onFail={() => undefined}
                 query={{
                   key: GOOGLE_MAPS_API_KEY,
                   language: 'en',
@@ -626,7 +614,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                     }
                     setTo({ description: data.description, location: details?.geometry?.location || null })
                   }}
-                  onFail={(error) => console.log('Places Error:', error)}
+                  onFail={() => undefined}
                   query={{
                     key: GOOGLE_MAPS_API_KEY,
                     language: 'en',
@@ -697,8 +685,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                           animated: true,
                         });
                       }}
-                      onError={(error) => {
-                        console.log('MapViewDirections Error:', error);
+                      onError={() => {
                         showAlert('Directions Error', 'Could not draw the route. Please check your locations.');
                       }}
                     />

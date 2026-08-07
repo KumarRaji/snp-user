@@ -114,11 +114,6 @@ const TripsScreen = () => {
       return;
     }
 
-    console.log('Submitting rating payload', {
-      rating: data.rating,
-      feedback: data.feedback,
-    });
-
     try {
       const response = await rateTrip(tripId, data.rating, data.feedback);
 

@@ -44,7 +44,6 @@ const LoginScreen = () => {
       const { PhoneNumberHint } = NativeModules;
 
       if (!PhoneNumberHint || !PhoneNumberHint.requestHint) {
-        console.log('PhoneNumberHint module not available');
         return;
       }
 
@@ -58,8 +57,6 @@ const LoginScreen = () => {
 
       setPhoneNumber(cleanNumber);
     } catch (error: unknown) {
-      console.log('Phone number hint error:', error);
-
       // Ignore cancel
       if (
         typeof error === 'object' &&
@@ -89,8 +86,7 @@ const LoginScreen = () => {
       if (res.success) {
         setStep('OTP');
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
       showAlert('Error', 'Error sending OTP. Please try again.');
     }
     setLoading(false);
@@ -111,8 +107,7 @@ const LoginScreen = () => {
       } else {
         showAlert('Incorrect OTP', 'The OTP you entered is incorrect. Please try again.', 'error');
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
       showAlert('Error', 'Error verifying OTP. Please try again.');
     }
     setLoading(false);

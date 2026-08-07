@@ -31,8 +31,7 @@ const HomeScreen = ({ navigation }: any) => {
         setProfile(JSON.parse(data));
         setIsProfileLoading(false);
       }
-    } catch (e) {
-      console.log('Error loading local profile', e);
+    } catch {
     }
   };
 
