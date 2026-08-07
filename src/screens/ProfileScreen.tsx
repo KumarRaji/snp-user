@@ -292,14 +292,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  name: { fontSize: 22, fontWeight: 'bold', marginBottom: 5 },
+  name: { fontSize: 22, fontWeight: 'bold', marginBottom: 2 },
 
-  info: { fontSize: 14, color: '#666', marginBottom: 5 },
+  info: { fontSize: 16, color: '#666', marginBottom: 0 },
 
-  phoneInfo: { marginTop: 0, marginBottom: 2 },
+  phoneInfo: { marginTop: 0, marginBottom: 2, fontSize: 14, color: '#666' },
 
   deleteBtn: {
-    marginTop: 8,
+    marginTop: 4,
     backgroundColor: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 16,
