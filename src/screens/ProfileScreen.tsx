@@ -137,7 +137,7 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
       {!isEditing ? (
         <>
           <Text style={styles.name}>{form.name}</Text>
-          <Text style={styles.info}>{form.phone}</Text>
+         <Text style={styles.info}>{form.phone}</Text>
           <Text style={styles.info}>{form.email}</Text>
 
           <TouchableOpacity
@@ -157,12 +157,6 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           />
           <TextInput
             style={styles.input}
-            value={form.email}
-            onChangeText={(t) => setForm((prev) => ({ ...prev, email: t }))}
-            placeholder="Email"
-          />
-          <TextInput
-            style={styles.input}
             value={form.phone}
             editable={false}
           />
@@ -178,11 +172,14 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
           </Text>
         ) : (
           <TextInput
-            style={styles.input}
+            style={[styles.input, { height: 80 }]}
             value={form.address}
             onChangeText={(t) => setForm((prev) => ({ ...prev, address: t }))}
             placeholder="Enter address"
+            multiline
           />
+
+          
         )}
       </View>
 
@@ -200,7 +197,9 @@ const ProfileScreen = ({ profile, navigation, onProfileUpdate }: any) => {
             <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadChoice}>
               <Text>{fileName ? fileName : (form.idProof ? 'Replace Uploaded File' : 'Choose File')}</Text>
             </TouchableOpacity>
-            <Text style={styles.helper}>Aadhaar / Voter ID / Passport</Text>
+            <Text style={styles.helper}>
+              Aadhar / Voter ID / DLL (No PAN Card) <Text style={styles.maxSizeText}>(Max 5MB)</Text>
+            </Text>
           </>
         )}
       </View>
@@ -297,8 +296,10 @@ const styles = StyleSheet.create({
 
   info: { fontSize: 14, color: '#666', marginBottom: 5 },
 
+  phoneInfo: { marginTop: 0, marginBottom: 2 },
+
   deleteBtn: {
-    marginTop: 12,
+    marginTop: 8,
     backgroundColor: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -365,6 +366,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 5,
+  },
+
+  maxSizeText: {
+    color: '#ff0000',
   },
 
   row: {

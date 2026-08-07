@@ -102,7 +102,7 @@ const CompleteProfileModal = ({ visible, onClose, onComplete, profile }: any) =>
   };
 
   const handleSubmit = async () => {
-    if (!name || !email || !address) {
+    if (!name || !address) {
       Alert.alert('Required', 'Please fill all details');
       return;
     }
@@ -111,9 +111,12 @@ const CompleteProfileModal = ({ visible, onClose, onComplete, profile }: any) =>
 
     const payload: any = {
       name,
-      email,
       address,
     };
+
+    if (email) {
+      payload.email = email;
+    }
 
     if (fileId) {
       payload.idProof = fileId;
@@ -145,13 +148,6 @@ const CompleteProfileModal = ({ visible, onClose, onComplete, profile }: any) =>
             onChangeText={setName}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
 
           <TextInput
             style={[styles.input, { height: 80 }]}
@@ -175,7 +171,7 @@ const CompleteProfileModal = ({ visible, onClose, onComplete, profile }: any) =>
           </TouchableOpacity>
 
           <Text style={styles.helper}>
-            Aadhaar / Voter ID / Passport (Max 5MB)
+            Aadhar / Voter ID / DLL (No PAN Card) <Text style={styles.maxSizeText}>(Max 5MB)</Text>
           </Text>
 
           {/* BUTTONS */}
@@ -267,6 +263,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginBottom: 15,
+  },
+
+  maxSizeText: {
+    color: '#ff0000',
   },
 
   row: {

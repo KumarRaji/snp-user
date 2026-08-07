@@ -117,9 +117,10 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       const packageType = serviceType;
       let url = `https://drivemate.api.luisant.cloud/api/pricing-packages/estimate?packageType=${packageType}`;
       let hours = parseInt(duration);
+      const isImmediate = whenNeeded === 'Immediately';
 
       if (packageType === 'LOCAL_HOURLY') {
-        url += `&hours=${hours}&distance=0`;
+        url += `&hours=${hours}&distance=0&whenNeeded=${encodeURIComponent(whenNeeded)}&isImmediate=${isImmediate}`;
       } else { // OUTSTATION
         if (!from.location || !to.location) {
           setEstimate(null);
@@ -134,7 +135,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             distance *= 2;
         }
 
-        url += `&distance=${Math.round(distance)}`;
+        url += `&distance=${Math.round(distance)}&whenNeeded=${encodeURIComponent(whenNeeded)}&isImmediate=${isImmediate}`;
       }
       
       const res = await fetch(url);
@@ -142,6 +143,23 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   
       let finalEstimate = data.estimate;
       let finalPricing = data.pricing;
+
+      if (finalPricing && !finalPricing.description) {
+        finalPricing.description = `${finalPricing.hours || hours} Hour Package`;
+      }
+
+      if (packageType === 'LOCAL_HOURLY' && finalPricing) {
+        finalEstimate = isImmediate
+          ? finalPricing.immediateCharge
+          : finalPricing.minimumCharge;
+
+        finalPricing = {
+          ...finalPricing,
+          displayExtraPerHour: isImmediate
+            ? finalPricing.extraPerHourImm
+            : finalPricing.extraPerHour,
+        };
+      }
 
       if (packageType === 'OUTSTATION' && data.pricing?.hours) {
         setDuration(`${data.pricing.hours} Hrs`);
@@ -155,7 +173,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       if (!finalPricing) {
         finalPricing = {
           description: `${hours} Hrs ${packageType === 'LOCAL_HOURLY' ? 'Local' : 'Outstation'} Package`,
-          extraPerHour: 100
+          extraPerHour: 100,
+          displayExtraPerHour: 100,
         };
         if (packageType === 'OUTSTATION' && data.success === false) {
           showAlert('Estimate Error', 'Could not fetch estimate for the selected route.', 'warning');
@@ -177,7 +196,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     if (serviceType === 'LOCAL_HOURLY') {
       fetchEstimate();
     }
-  }, [duration, serviceType]);
+  }, [duration, serviceType, whenNeeded]);
 
   useEffect(() => {
     if (serviceType === 'OUTSTATION' && from.location && to.location) {
@@ -186,7 +205,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       setEstimate(null);
       setPricing(null);
     }
-  }, [from.location, to.location, tripType, serviceType]);
+  }, [from.location, to.location, tripType, serviceType, whenNeeded]);
 
   // Smoothly animate map to pickup location if drop-off isn't selected yet
   useEffect(() => {
@@ -689,7 +708,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             )}
 
             {/* SCHEDULE */}
-            <Text style={styles.sectionTitle}>Schedule Details</Text>
+            
 
             {renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver'], 'driver', setDriverType)}
             {serviceType === 'OUTSTATION' ? (
@@ -697,6 +716,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             ) : (
               renderDropdown('When do you need?', whenNeeded, ['Immediately','Schedule'], 'when', setWhenNeeded)
             )}
+            <Text style={styles.sectionTitle}>Schedule Details</Text>
             {renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
 
             {showScheduleFields && (
@@ -736,18 +756,18 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   <ActivityIndicator />
                 ) : (
                   <>
-                    <Text style={styles.price}>₹{estimate || 0}</Text>
+                    <Text style={styles.price}>₹{estimate ?? 0}</Text>
               
                     {pricing && (
                       <>
                         <Text style={styles.packageText}>
-                          {pricing.description}
+                          {pricing.description || `${pricing.hours || parseInt(duration)} Hour Package`}
                         </Text>
               
                         <View style={styles.divider} />
               
                         <Text style={styles.extraText}>
-                          EXTRA PER HOUR: ₹{pricing.extraPerHour}
+                          EXTRA PER HOUR: RS.{pricing.displayExtraPerHour ?? pricing.extraPerHour}/-
                         </Text>
               
                         <TouchableOpacity style={styles.moreInfoBtn} onPress={() => setShowChargesModal(true)}>
@@ -755,6 +775,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                           <Text style={styles.moreText}>
                             More charges apply
                           </Text>
+                          <Ionicons name="chevron-forward" size={16} color="#0066cc" />
                         </TouchableOpacity>
                       </>
                     )}
@@ -817,14 +838,6 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
               onPress={() => handleBook('CASH')}
             >
               <Text style={styles.paymentText}>💳 Cash</Text>
-            </TouchableOpacity>
-
-            {/* UPI */}
-            <TouchableOpacity
-              style={[styles.paymentBtn, { backgroundColor: '#2563eb' }]}
-              onPress={() => handleBook('UPI')}
-            >
-              <Text style={styles.paymentText}>💬 UPI</Text>
             </TouchableOpacity>
 
             {/* CANCEL */}
