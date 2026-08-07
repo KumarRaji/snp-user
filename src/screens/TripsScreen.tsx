@@ -8,6 +8,7 @@ const TripsScreen = () => {
   const { userToken } = useAuth();
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -29,7 +30,9 @@ const TripsScreen = () => {
       return;
     }
 
-    setLoading(true);
+    if (initialLoading) {
+      setLoading(true);
+    }
     const res = await getMyTrips();
 
     const rawBookings = Array.isArray(res?.bookings)
@@ -60,6 +63,7 @@ const TripsScreen = () => {
 
     setTrips(filteredTrips);
     setLoading(false);
+    setInitialLoading(false);
   }, [userToken]);
 
   useFocusEffect(
