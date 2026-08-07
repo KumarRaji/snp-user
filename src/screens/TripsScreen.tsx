@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Linking, Image, ScrollView, Alert, TextInput } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getMyTrips, cancelTrip, rateTrip } from '../api/tripApi';
 import { useAuth } from '../context/AuthContext';
 
@@ -61,15 +62,11 @@ const TripsScreen = () => {
     setLoading(false);
   }, [userToken]);
 
-  useEffect(() => {
-    loadTrips();
-
-    const intervalId = setInterval(() => {
+  useFocusEffect(
+    useCallback(() => {
       loadTrips();
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [loadTrips]);
+    }, [loadTrips])
+  );
 
   const confirmCancelTrip = async () => {
     if (!selectedBookingId) return;

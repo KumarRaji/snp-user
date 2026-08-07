@@ -56,6 +56,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const [duration, setDuration] = useState('4 Hrs');
   const [carType, setCarType] = useState('Manual');
   const [vehicleType, setVehicleType] = useState('Hatchback');
+  const [hoursPerDay, setHoursPerDay] = useState('8 Hours');
+  const [daysPerWeek, setDaysPerWeek] = useState('6 Days');
 
   // ✅ NEW
   const [date, setDate] = useState('');
@@ -270,7 +272,11 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         duration,
         carType,
         vehicleType,
-        estimateAmount: estimate,
+        ...(driverType === 'Monthly Driver' && {
+          hoursPerDay: parseInt(hoursPerDay),
+          daysPerWeek: parseInt(daysPerWeek),
+        }),
+        estimateAmount: driverType === 'Monthly Driver' ? monthlyAmount : estimate,
         startDateTime: startDateTimeObj.toISOString(),
         paymentMethod,
       });
@@ -373,6 +379,13 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     const maxHours = serviceType === 'OUTSTATION' ? 30 : 12;
     return Array.from({ length: maxHours - 3 }, (_, i) => `${i + 4} Hrs`);
   };
+
+  const monthlyRate = 100;
+  const monthlyAmount =
+    parseInt(hoursPerDay) *
+    parseInt(daysPerWeek) *
+    4 *
+    monthlyRate;
 
   const renderDropdown = (
     label: string,
@@ -697,14 +710,22 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             {/* SCHEDULE */}
             
 
-            {renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver'], 'driver', setDriverType)}
-            {serviceType === 'OUTSTATION' ? (
+            {driverType !== 'Weekly Driver' && driverType !== 'Monthly Driver' && renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver'], 'driver', setDriverType)}
+            {driverType !== 'Monthly Driver' && (serviceType === 'OUTSTATION' ? (
               renderDropdown('Select Trip Type', tripType, ['One Way', 'Round Trip'], 'tripTypeDropdown', setTripType)
             ) : (
               renderDropdown('When do you need?', whenNeeded, ['Immediately','Schedule'], 'when', setWhenNeeded)
+            ))}
+            {driverType !== 'Monthly Driver' && <Text style={styles.sectionTitle}>Schedule Details</Text>}
+            {driverType !== 'Monthly Driver' &&
+              renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
+
+            {driverType === 'Monthly Driver' && (
+              <>
+                {renderDropdown('Hours Per Day', hoursPerDay, ['8 Hours', '10 Hours', '12 Hours','1 Day'], 'hoursPerDay', setHoursPerDay)}
+                {renderDropdown('Days Per Week', daysPerWeek, ['5 Days', '6 Days'], 'daysPerWeek', setDaysPerWeek)}
+              </>
             )}
-            <Text style={styles.sectionTitle}>Schedule Details</Text>
-            {renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
 
             {showScheduleFields && (
               <>
@@ -731,44 +752,54 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
               />
             )}
 
-            {renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
+            {driverType !== 'Monthly Driver' && renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
             {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
 
             {/* FARE */}
-            {!(serviceType === 'OUTSTATION' && !estimate) && (
+            {driverType === 'Monthly Driver' ? (
               <View style={styles.fareCard}>
-                <Text style={styles.fareTitle}>Estimated fare</Text>
-              
-                {estimateLoading ? (
-                  <ActivityIndicator />
-                ) : (
-                  <>
-                    <Text style={styles.price}>₹{estimate ?? 0}</Text>
-              
-                    {pricing && (
-                      <>
-                        <Text style={styles.packageText}>
-                          {pricing.description || `${pricing.hours || parseInt(duration)} Hour Package`}
-                        </Text>
-              
-                        <View style={styles.divider} />
-              
-                        <Text style={styles.extraText}>
-                          EXTRA PER HOUR: RS.{pricing.displayExtraPerHour ?? pricing.extraPerHour}/-
-                        </Text>
-              
-                        <TouchableOpacity style={styles.moreInfoBtn} onPress={() => setShowChargesModal(true)}>
-                          <Ionicons name="information-circle-outline" size={16} color="#0066cc" />
-                          <Text style={styles.moreText}>
-                            More charges apply
-                          </Text>
-                          <Ionicons name="chevron-forward" size={16} color="#0066cc" />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </>
-                )}
+                <Text style={styles.fareTitle}>Monthly Charges</Text>
+                <Text style={styles.price}>₹{monthlyAmount}</Text>
+                <Text style={styles.packageText}>
+                  {parseInt(hoursPerDay)} hrs/day × {parseInt(daysPerWeek)} days/week × 4 weeks × ₹{monthlyRate}/hr
+                </Text>
+                <View style={styles.divider} />
+                <Text style={[styles.extraText, { color: 'red' }]}>EXTRA PER HOUR: RS.100/-</Text>
               </View>
+            ) : (
+              !(serviceType === 'OUTSTATION' && !estimate) && (
+                <View style={styles.fareCard}>
+                  <Text style={styles.fareTitle}>Estimated fare</Text>
+                
+                  {estimateLoading ? (
+                    <ActivityIndicator />
+                  ) : (
+                    <>
+                      <Text style={styles.price}>₹{estimate ?? 0}</Text>
+                
+                      {pricing && (
+                        <>
+                          <Text style={styles.packageText}>
+                            {pricing.description || `${pricing.hours || parseInt(duration)} Hour Package`}
+                          </Text>
+                
+                          <View style={styles.divider} />
+                
+                          <Text style={styles.extraText}>
+                            EXTRA PER HOUR: RS.{pricing.displayExtraPerHour ?? pricing.extraPerHour}/-
+                          </Text>
+                
+                          <TouchableOpacity style={styles.moreInfoBtn} onPress={() => setShowChargesModal(true)}>
+                            <Ionicons name="information-circle-outline" size={16} color="#0066cc" />
+                            <Text style={styles.moreText}>More charges apply</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#0066cc" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </>
+                  )}
+                </View>
+              )
             )}
 
             {/* TERMS */}
