@@ -64,6 +64,10 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const [time, setTime] = useState('');
   const [dateObj, setDateObj] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [returnDate, setReturnDate] = useState('');
+  const [returnTime, setReturnTime] = useState('');
+  const [returnDateObj, setReturnDateObj] = useState(new Date());
+  const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
 
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,6 +88,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const [estimate, setEstimate] = useState<number | null>(null);
   const [pricing, setPricing] = useState<any>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
+  const [routeDistance, setRouteDistance] = useState<number | null>(null);
+  const [routeDuration, setRouteDuration] = useState<number | null>(null);
 
   // ✅ FIXED LOGIC
   const showDropLocation =
@@ -100,6 +106,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const resetForm = () => {
     setFrom({ description: '', location: null });
     setTo({ description: '', location: null });
+    setRouteDistance(null);
+    setRouteDuration(null);
     setDriverType('Daily Driver');
     setWhenNeeded('Immediately');
     setCarType('Manual');
@@ -107,6 +115,10 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     setDate('');
     setTime('');
     setDateObj(new Date());
+    setReturnDate('');
+    setReturnTime('');
+    setReturnDateObj(new Date());
+    setShowReturnDatePicker(false);
     setAgree(false);
     fromRef.current?.setAddressText('');
     toRef.current?.setAddressText('');
@@ -122,16 +134,17 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       const isImmediate = whenNeeded === 'Immediately';
 
       if (packageType === 'LOCAL_HOURLY') {
-        url += `&hours=${hours}&distance=0&whenNeeded=${encodeURIComponent(whenNeeded)}&isImmediate=${isImmediate}`;
+        const distance = tripType === 'One Way' ? routeDistance ?? 0 : 0;
+        url += `&hours=${hours}&distance=${Math.round(distance)}&whenNeeded=${encodeURIComponent(whenNeeded)}&isImmediate=${isImmediate}`;
       } else { // OUTSTATION
-        if (!from.location || !to.location) {
+        if (!from.location || !to.location || routeDistance === null) {
           setEstimate(null);
           setPricing(null);
           setEstimateLoading(false);
           return;
         }
 
-        let distance = getDistanceFromLatLonInKm(from.location.lat, from.location.lng, to.location.lat, to.location.lng);
+        let distance = routeDistance;
         
         if (tripType === 'Round Trip') {
             distance *= 2;
@@ -155,11 +168,20 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
           ? finalPricing.immediateCharge
           : finalPricing.minimumCharge;
 
+        if (tripType === 'One Way' && routeDistance !== null) {
+          hours = finalPricing.hours || (routeDistance >= 60 ? 6 : hours);
+          setDuration(`${hours} Hrs`);
+        }
+
         finalPricing = {
           ...finalPricing,
           displayExtraPerHour: isImmediate
             ? finalPricing.extraPerHourImm
             : finalPricing.extraPerHour,
+          description:
+            tripType === 'One Way' && routeDistance !== null && routeDistance >= 60
+              ? `${hours} Hours Package (Min KM 60)`
+              : finalPricing.description || `${hours} Hour Package`,
         };
       }
 
@@ -173,8 +195,16 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         finalEstimate = hours === 4 ? 500 : hours * 125;
       }
       if (!finalPricing) {
+        if (packageType === 'LOCAL_HOURLY' && tripType === 'One Way' && routeDistance !== null) {
+          hours = routeDistance >= 60 ? 6 : hours;
+          setDuration(`${hours} Hrs`);
+        }
+
         finalPricing = {
-          description: `${hours} Hrs ${packageType === 'LOCAL_HOURLY' ? 'Local' : 'Outstation'} Package`,
+          description:
+            packageType === 'LOCAL_HOURLY' && tripType === 'One Way' && routeDistance !== null && routeDistance >= 60
+              ? `${hours} Hours Package (Min KM 60)`
+              : `${hours} Hrs ${packageType === 'LOCAL_HOURLY' ? 'Local' : 'Outstation'} Package`,
           extraPerHour: 100,
           displayExtraPerHour: 100,
         };
@@ -197,16 +227,16 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     if (serviceType === 'LOCAL_HOURLY') {
       fetchEstimate();
     }
-  }, [duration, serviceType, whenNeeded]);
+  }, [duration, serviceType, whenNeeded, tripType, routeDistance, from.location, to.location]);
 
   useEffect(() => {
-    if (serviceType === 'OUTSTATION' && from.location && to.location) {
+    if (serviceType === 'OUTSTATION' && from.location && to.location && routeDistance !== null) {
       fetchEstimate();
     } else if (serviceType === 'OUTSTATION') {
       setEstimate(null);
       setPricing(null);
     }
-  }, [from.location, to.location, tripType, serviceType, whenNeeded]);
+  }, [from.location, to.location, tripType, serviceType, whenNeeded, routeDistance]);
 
   // Smoothly animate map to pickup location if drop-off isn't selected yet
   useEffect(() => {
@@ -243,6 +273,21 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
       return;
     }
 
+    if (serviceType === 'OUTSTATION' && tripType === 'Round Trip') {
+      if (!date || !time) {
+        showAlert('Required', 'Please select From Date & Time.', 'warning');
+        return;
+      }
+      if (!returnDate || !returnTime) {
+        showAlert('Required', 'Please select To Date & Time (Return).', 'warning');
+        return;
+      }
+      if (returnDate < date) {
+        showAlert('Invalid Date', 'Return date cannot be before the From date.', 'warning');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -256,6 +301,23 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         
         startDateTimeObj = new Date(dateObj);
         startDateTimeObj.setHours(hrs, parseInt(minutes, 10), 0, 0);
+      }
+
+      let endDateTimeObj: Date | null = null;
+      if (
+        serviceType === 'OUTSTATION' &&
+        tripType === 'Round Trip' &&
+        returnDate &&
+        returnTime
+      ) {
+        const [timePart, modifier] = returnTime.split(' ');
+        const [hours, minutes] = timePart.split(':');
+        let hrs = parseInt(hours, 10);
+        if (hrs === 12) hrs = 0;
+        if (modifier === 'pm') hrs += 12;
+
+        endDateTimeObj = new Date(returnDateObj);
+        endDateTimeObj.setHours(hrs, parseInt(minutes, 10), 0, 0);
       }
 
       const normalizedDriverType =
@@ -278,6 +340,9 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         }),
         estimateAmount: driverType === 'Monthly Driver' ? monthlyAmount : estimate,
         startDateTime: startDateTimeObj.toISOString(),
+        ...(endDateTimeObj && {
+          endDateTime: endDateTimeObj.toISOString(),
+        }),
         paymentMethod,
       });
 
@@ -344,6 +409,18 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     }
   };
 
+  const onChangeReturnDate = (event: any, selectedDate?: Date) => {
+    setShowReturnDatePicker(false);
+    if (selectedDate) {
+      setReturnDateObj(selectedDate);
+      const yyyy = selectedDate.getFullYear();
+      const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(selectedDate.getDate()).padStart(2, '0');
+      setReturnDate(`${yyyy}-${mm}-${dd}`);
+      setReturnTime('');
+    }
+  };
+
   const getAvailableTimeSlots = () => {
     const slots: string[] = [];
     let start = new Date();
@@ -375,6 +452,38 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     return slots;
   };
 
+  const getReturnTimeSlots = () => {
+    const slots: string[] = [];
+    let start = new Date(returnDateObj);
+
+    if (returnDateObj.toDateString() === new Date().toDateString()) {
+      start = new Date();
+      start.setMinutes(start.getMinutes() + 30);
+      const remainder = start.getMinutes() % 30;
+      if (remainder !== 0) {
+        start.setMinutes(start.getMinutes() + (30 - remainder));
+      }
+    } else {
+      start.setHours(0, 0, 0, 0);
+    }
+
+    const endOfDay = new Date(start);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    while (start <= endOfDay) {
+      let hrs = start.getHours();
+      const mins = start.getMinutes();
+      const ampm = hrs >= 12 ? 'pm' : 'am';
+      hrs = hrs % 12;
+      hrs = hrs ? hrs : 12;
+      const minsStr = mins === 0 ? '00' : String(mins).padStart(2, '0');
+      slots.push(`${hrs}:${minsStr} ${ampm}`);
+      start.setMinutes(start.getMinutes() + 30);
+    }
+
+    return slots;
+  };
+
   const getUsageOptions = () => {
     const maxHours = serviceType === 'OUTSTATION' ? 30 : 12;
     return Array.from({ length: maxHours - 3 }, (_, i) => `${i + 4} Hrs`);
@@ -395,7 +504,7 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     onSelect: (v: string) => void
   ) => (
     <View style={{ marginBottom: 15 }}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
 
       <TouchableOpacity
         style={styles.dropdownBox}
@@ -593,6 +702,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                   if (!details?.geometry?.location) {
                     showAlert('Error', 'Could not get location coordinates.');
                   }
+                  setRouteDistance(null);
+                  setRouteDuration(null);
                   setFrom({ description: data.description, location: details?.geometry?.location || null })
                 }}
                 onFail={() => undefined}
@@ -625,6 +736,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                     if (!details?.geometry?.location) {
                       showAlert('Error', 'Could not get location coordinates.');
                     }
+                    setRouteDistance(null);
+                    setRouteDuration(null);
                     setTo({ description: data.description, location: details?.geometry?.location || null })
                   }}
                   onFail={() => undefined}
@@ -693,12 +806,16 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                       strokeColor="black"
                       mode="DRIVING"
                       onReady={(result) => {
+                        setRouteDistance(Math.round(result.distance));
+                        setRouteDuration(Math.round(result.duration));
                         mapRef.current?.fitToCoordinates(result.coordinates, {
                           edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
                           animated: true,
                         });
                       }}
                       onError={() => {
+                        setRouteDistance(null);
+                        setRouteDuration(null);
                         showAlert('Directions Error', 'Could not draw the route. Please check your locations.');
                       }}
                     />
@@ -729,31 +846,92 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
             {showScheduleFields && (
               <>
-                {/* DATE */}
-                <View style={{ marginBottom: 15 }}>
-                  <Text style={styles.label}>Date</Text>
-                  <TouchableOpacity style={styles.dropdownBox} onPress={() => setShowDatePicker(true)}>
-                    <Text>{date ? date.split('-').reverse().join('-') : 'dd-mm-yyyy'}</Text>
+                <Text style={styles.label}>
+                  {serviceType === 'OUTSTATION' && tripType === 'Round Trip'
+                    ? 'From Date & Time'
+                    : 'Date & Time'}
+                </Text>
+                <View style={styles.dateTimeRow}>
+                  <TouchableOpacity
+                    style={styles.dateTimeBox}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={styles.dateTimeText}>
+                      {date ? date.split('-').reverse().join('-') : 'dd-mm-yyyy'}
+                    </Text>
                   </TouchableOpacity>
+                  <View style={styles.dateTimeTimeContainer}>
+                    {renderDropdown('', time || 'Select time', getAvailableTimeSlots(), 'time', setTime)}
+                  </View>
                 </View>
 
-                {/* TIME */}
-                {renderDropdown('Select Time', time || 'Select time', getAvailableTimeSlots(), 'time', setTime)}
-              </>
-            )}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={dateObj}
+                    mode="date"
+                    display="default"
+                    onChange={onChangeDate}
+                    minimumDate={new Date()}
+                  />
+                )}
 
-            {showDatePicker && showScheduleFields && (
-              <DateTimePicker
-                value={dateObj}
-                mode="date"
-                display="default"
-                onChange={onChangeDate}
-                minimumDate={new Date()}
-              />
+                {serviceType === 'OUTSTATION' && tripType === 'Round Trip' && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 5 }]}>To Date & Time (Return)</Text>
+                    <View style={styles.dateTimeRow}>
+                      <TouchableOpacity
+                        style={styles.dateTimeBox}
+                        onPress={() => setShowReturnDatePicker(true)}
+                      >
+                        <Text style={styles.dateTimeText}>
+                          {returnDate ? returnDate.split('-').reverse().join('-') : 'dd-mm-yyyy'}
+                        </Text>
+                      </TouchableOpacity>
+                      <View style={styles.dateTimeTimeContainer}>
+                        {renderDropdown('', returnTime || 'Select time', getReturnTimeSlots(), 'returnTime', setReturnTime)}
+                      </View>
+                    </View>
+
+                    {showReturnDatePicker && (
+                      <DateTimePicker
+                        value={returnDateObj}
+                        mode="date"
+                        display="default"
+                        onChange={onChangeReturnDate}
+                        minimumDate={dateObj > new Date() ? dateObj : new Date()}
+                      />
+                    )}
+                  </>
+                )}
+              </>
             )}
 
             {driverType !== 'Monthly Driver' && renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
             {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
+
+            {/* ROUTE DISTANCE & TRAVEL TIME */}
+            {driverType !== 'Monthly Driver' &&
+              routeDistance !== null &&
+              routeDuration !== null &&
+              from.location &&
+              to.location && (
+                <View style={styles.routeInfoCard}>
+                  <View style={styles.routeInfoRow}>
+                    <View style={styles.routeIconCircle}>
+                      <Ionicons name="trending-up" size={22} color="#fff" />
+                    </View>
+                    <View style={styles.routeInfoContent}>
+                      <Text style={styles.routeDistanceText}>{routeDistance} km</Text>
+                      <Text style={styles.routeDurationText}>
+                        {Math.floor(routeDuration / 60)}h {routeDuration % 60}m
+                        {' • '}
+                        {duration}
+                        {tripType === 'Round Trip' ? ' (Round trip)' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
 
             {/* FARE */}
             {driverType === 'Monthly Driver' ? (
@@ -910,6 +1088,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
             {/* CONTENT */}
             <Text style={styles.modalText}>
               • Extra Pay for One Way Drop Return Ticket
+              {'\n'}• Food Extra
+              {'\n'}• Staying Accommodation (Not Mandatory)
             </Text>
           </View>
         </View>
@@ -998,21 +1178,79 @@ const styles = StyleSheet.create({
 
   dropdownBox: {
     backgroundColor: '#eee',
-    padding: 15,
+    height: 58,
+    paddingHorizontal: 15,
     borderRadius: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 
   dropdownList: { backgroundColor: '#fff', borderRadius: 10 },
 
   dropdownItem: { padding: 15 },
 
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  dateTimeBox: {
+    flex: 1,
+    height: 58,
+    backgroundColor: '#eee',
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  dateTimeTimeContainer: {
+    flex: 1,
+    height: 58,
+  },
+  dateTimeText: {
+    fontSize: 16,
+    color: '#222',
+  },
+
   fareCard: {
     backgroundColor: '#e6f5f1',
     padding: 15,
     borderRadius: 10,
     marginBottom: 15
+  },
+
+  routeInfoCard: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 15,
+  },
+  routeInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  routeInfoContent: {
+    flex: 1,
+  },
+  routeDistanceText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111',
+  },
+  routeDurationText: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
   },
 
   fareTitle: { fontSize: 14, color: '#666', marginBottom: 5 },

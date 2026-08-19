@@ -129,9 +129,22 @@ const TripsScreen = () => {
     }
   };
 
+  const formatDateTime = (dateTime: string) => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    const dateStr = date.toLocaleDateString('en-GB').replace(/\//g, '-');
+    const timeStr = date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${dateStr}, ${timeStr}`;
+  };
+
   const renderItem = ({ item }: any) => {
-    const d = new Date(item.startDateTime || item.createdAt || Date.now());
-    const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const goingDateTime = formatDateTime(item.startDateTime || item.createdAt);
+    const returnDateTime = item.endDateTime
+      ? formatDateTime(item.endDateTime)
+      : '';
 
     const rawType = item.serviceType || item.bookingType;
 
@@ -164,7 +177,16 @@ const TripsScreen = () => {
       <View style={styles.card}>
         {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.date}>{dateStr}</Text>
+          <View style={styles.tripDateContainer}>
+            <Text style={styles.tripDateText}>
+              🚗 Going — {goingDateTime}
+            </Text>
+            {item.endDateTime && (
+              <Text style={styles.tripDateText}>
+                🏠 Return — {returnDateTime}
+              </Text>
+            )}
+          </View>
 
           <View style={styles.headerRight}>
             {isCancellationPending ? (
@@ -608,6 +630,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 0,
     alignItems: 'center'
+  },
+
+  tripDateContainer: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  tripDateText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#222',
+    marginBottom: 5,
   },
 
   date: {
