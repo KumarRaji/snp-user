@@ -68,6 +68,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
   const [returnTime, setReturnTime] = useState('');
   const [returnDateObj, setReturnDateObj] = useState(new Date());
   const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [showReturnTimeModal, setShowReturnTimeModal] = useState(false);
 
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -293,7 +295,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     try {
       let startDateTimeObj = new Date();
       if (date && time) {
-        const [timePart, modifier] = time.split(' ');
+        const [timePart, timeModifier] = time.split(' ');
+        const modifier = timeModifier?.toLowerCase();
         let [hours, minutes] = timePart.split(':');
         let hrs = parseInt(hours, 10);
         if (hrs === 12) hrs = 0;
@@ -310,7 +313,8 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         returnDate &&
         returnTime
       ) {
-        const [timePart, modifier] = returnTime.split(' ');
+        const [timePart, timeModifier] = returnTime.split(' ');
+        const modifier = timeModifier?.toLowerCase();
         const [hours, minutes] = timePart.split(':');
         let hrs = parseInt(hours, 10);
         if (hrs === 12) hrs = 0;
@@ -397,88 +401,176 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     }
   };
 
-  const onChangeDate = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDateObj(selectedDate);
-      const yyyy = selectedDate.getFullYear();
-      const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(selectedDate.getDate()).padStart(2, '0');
-      setDate(`${yyyy}-${mm}-${dd}`);
-      setTime(''); // Reset time when date changes
-    }
+  const formatDateLocal = (value: Date) => {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, '0');
+    const dd = String(value.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
-  const onChangeReturnDate = (event: any, selectedDate?: Date) => {
-    setShowReturnDatePicker(false);
-    if (selectedDate) {
-      setReturnDateObj(selectedDate);
-      const yyyy = selectedDate.getFullYear();
-      const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(selectedDate.getDate()).padStart(2, '0');
-      setReturnDate(`${yyyy}-${mm}-${dd}`);
+  const formatDateDisplay = (value: string) => {
+    if (!value) return 'dd-mm-yyyy';
+    const [yyyy, mm, dd] = value.split('-');
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
+  const isSameLocalDate = (date1: Date, date2: Date) => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  };
+
+  const onChangeDate = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (event?.type === 'dismissed' || !selectedDate) {
+      return;
+    }
+
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+    setDateObj(selected);
+    const formatted = formatDateLocal(selected);
+    setDate(formatted);
+    setTime('');
+
+    if (returnDateObj < selected) {
+      setReturnDateObj(new Date(selected));
+      setReturnDate(formatted);
       setReturnTime('');
     }
   };
 
+  const onChangeReturnDate = (
+    event: any,
+    selectedDate?: Date
+  ) => {
+    setShowReturnDatePicker(false);
+    if (event?.type === 'dismissed' || !selectedDate) {
+      return;
+    }
+
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+
+    if (selected < dateObj) {
+      showAlert(
+        'Invalid Date',
+        'Return date cannot be before the From date.',
+        'warning'
+      );
+      return;
+    }
+
+    setReturnDateObj(selected);
+    const formatted = formatDateLocal(selected);
+    setReturnDate(formatted);
+    setReturnTime('');
+  };
+
   const getAvailableTimeSlots = () => {
     const slots: string[] = [];
-    let start = new Date();
-    
-    if (dateObj.toDateString() === new Date().toDateString()) {
-      start.setMinutes(start.getMinutes() + 30);
-      const remainder = start.getMinutes() % 30;
-      if (remainder !== 0) {
-        start.setMinutes(start.getMinutes() + (30 - remainder));
+    const now = new Date();
+    let startTime: Date;
+
+    if (isSameLocalDate(dateObj, now)) {
+      startTime = new Date();
+      startTime.setMinutes(startTime.getMinutes() + 30);
+      startTime.setSeconds(0);
+      startTime.setMilliseconds(0);
+
+      const minutes = startTime.getMinutes();
+      if (minutes <= 30) {
+        startTime.setMinutes(30);
+      } else {
+        startTime.setHours(startTime.getHours() + 1);
+        startTime.setMinutes(0);
       }
     } else {
-      start = new Date(dateObj);
-      start.setHours(0, 0, 0, 0);
+      startTime = new Date(dateObj);
+      startTime.setHours(0, 0, 0, 0);
     }
 
-    const endOfDay = new Date(start);
-    endOfDay.setHours(23, 59, 59, 999);
+    for (let i = 0; i < 48; i++) {
+      const slot = new Date(
+        startTime.getTime() + i * 30 * 60 * 1000
+      );
+      if (slot.getDate() !== dateObj.getDate()) {
+        break;
+      }
 
-    while (start <= endOfDay) {
-      let hrs = start.getHours();
-      let mins = start.getMinutes();
-      const ampm = hrs >= 12 ? 'pm' : 'am';
-      hrs = hrs % 12;
-      hrs = hrs ? hrs : 12; 
-      const minsStr = mins === 0 ? '00' : String(mins).padStart(2, '0');
-      slots.push(`${hrs}:${minsStr} ${ampm}`);
-      start.setMinutes(start.getMinutes() + 30);
+      const hours = slot.getHours();
+      const minutes = slot.getMinutes();
+      const displayHours = hours % 12 || 12;
+      const displayMinutes = minutes.toString().padStart(2, '0');
+      const period = hours >= 12 ? 'PM' : 'AM';
+      slots.push(`${displayHours}:${displayMinutes} ${period}`);
     }
+
     return slots;
   };
 
   const getReturnTimeSlots = () => {
     const slots: string[] = [];
-    let start = new Date(returnDateObj);
+    const now = new Date();
+    let startTime: Date;
 
-    if (returnDateObj.toDateString() === new Date().toDateString()) {
-      start = new Date();
-      start.setMinutes(start.getMinutes() + 30);
-      const remainder = start.getMinutes() % 30;
-      if (remainder !== 0) {
-        start.setMinutes(start.getMinutes() + (30 - remainder));
+    if (isSameLocalDate(returnDateObj, now)) {
+      startTime = new Date();
+      startTime.setMinutes(startTime.getMinutes() + 30);
+      startTime.setSeconds(0);
+      startTime.setMilliseconds(0);
+
+      const minutes = startTime.getMinutes();
+      if (minutes <= 30) {
+        startTime.setMinutes(30);
+      } else {
+        startTime.setHours(startTime.getHours() + 1);
+        startTime.setMinutes(0);
       }
     } else {
-      start.setHours(0, 0, 0, 0);
+      startTime = new Date(returnDateObj);
+      startTime.setHours(0, 0, 0, 0);
     }
 
-    const endOfDay = new Date(start);
-    endOfDay.setHours(23, 59, 59, 999);
+    if (date && returnDate && date === returnDate && time) {
+      const [timePart, period] = time.split(' ');
+      const [hours, minutes] = timePart.split(':');
+      let fromHours = Number(hours);
 
-    while (start <= endOfDay) {
-      let hrs = start.getHours();
-      const mins = start.getMinutes();
-      const ampm = hrs >= 12 ? 'pm' : 'am';
-      hrs = hrs % 12;
-      hrs = hrs ? hrs : 12;
-      const minsStr = mins === 0 ? '00' : String(mins).padStart(2, '0');
-      slots.push(`${hrs}:${minsStr} ${ampm}`);
-      start.setMinutes(start.getMinutes() + 30);
+      if (period === 'PM' && fromHours !== 12) {
+        fromHours += 12;
+      }
+      if (period === 'AM' && fromHours === 12) {
+        fromHours = 0;
+      }
+
+      const fromTime = new Date(returnDateObj);
+      fromTime.setHours(fromHours, Number(minutes), 0, 0);
+      const minimumReturnTime = new Date(
+        fromTime.getTime() + 30 * 60 * 1000
+      );
+
+      if (minimumReturnTime > startTime) {
+        startTime = minimumReturnTime;
+      }
+    }
+
+    for (let i = 0; i < 48; i++) {
+      const slot = new Date(
+        startTime.getTime() + i * 30 * 60 * 1000
+      );
+      if (slot.getDate() !== returnDateObj.getDate()) {
+        break;
+      }
+
+      const hours = slot.getHours();
+      const minutes = slot.getMinutes();
+      const displayHours = hours % 12 || 12;
+      const displayMinutes = minutes.toString().padStart(2, '0');
+      const period = hours >= 12 ? 'PM' : 'AM';
+      slots.push(`${displayHours}:${displayMinutes} ${period}`);
     }
 
     return slots;
@@ -503,7 +595,12 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
     key: string,
     onSelect: (v: string) => void
   ) => (
-    <View style={{ marginBottom: 15 }}>
+    <View
+      style={[
+        styles.dropdownWrapper,
+        openDropdown === key && styles.dropdownWrapperOpen,
+      ]}
+    >
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
       <TouchableOpacity
@@ -512,26 +609,42 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
           setOpenDropdown(openDropdown === key ? null : key)
         }
       >
-        <Text>{value}</Text>
-        <Text>{openDropdown === key ? '▲' : '▼'}</Text>
+        <Text style={styles.dropdownValue}>{value}</Text>
+        <Text style={styles.dropdownArrow}>
+          {openDropdown === key ? '▲' : '▼'}
+        </Text>
       </TouchableOpacity>
 
       {openDropdown === key && (
-        <View style={styles.dropdownList}>
-          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
+        <View
+          style={[
+            styles.dropdownList,
+            key === 'vehicle' && styles.dropdownListAbove,
+          ]}
+        >
+          <ScrollView
+            style={styles.dropdownScroll}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
             {options.length === 0 ? (
-              <Text style={{ padding: 15, color: '#999' }}>No slots available</Text>
+              <Text style={styles.noSlotsText}>
+                No slots available
+              </Text>
             ) : (
               options.map((opt) => (
                 <TouchableOpacity
                   key={opt}
-                  style={styles.dropdownItem}
+                  style={[
+                    styles.dropdownItem,
+                    value === opt && styles.selectedDropdownItem,
+                  ]}
                   onPress={() => {
                     onSelect(opt);
                     setOpenDropdown(null);
                   }}
                 >
-                  <Text>{opt}</Text>
+                  <Text style={styles.dropdownItemText}>{opt}</Text>
                 </TouchableOpacity>
               ))
             )}
@@ -829,18 +942,48 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
 
             {driverType !== 'Weekly Driver' && driverType !== 'Monthly Driver' && renderDropdown('Choose Service', driverType, ['Acting Driver', 'Spare Driver', 'Temporary Driver', 'Valet/Wallet Parking', 'Daily Driver'], 'driver', setDriverType)}
             {driverType !== 'Monthly Driver' && (serviceType === 'OUTSTATION' ? (
-              renderDropdown('Select Trip Type', tripType, ['One Way', 'Round Trip'], 'tripTypeDropdown', setTripType)
+              renderDropdown(
+                'Select Trip Type',
+                tripType,
+                ['One Way', 'Round Trip'].filter(option => option !== tripType),
+                'tripTypeDropdown',
+                setTripType
+              )
             ) : (
-              renderDropdown('When do you need?', whenNeeded, ['Immediately','Schedule'], 'when', setWhenNeeded)
+              renderDropdown(
+                'When do you need?',
+                whenNeeded,
+                ['Immediately', 'Schedule'].filter(option => option !== whenNeeded),
+                'when',
+                setWhenNeeded
+              )
             ))}
             {driverType !== 'Monthly Driver' && <Text style={styles.sectionTitle}>Schedule Details</Text>}
             {driverType !== 'Monthly Driver' &&
-              renderDropdown('Estimated Usage', duration, getUsageOptions(), 'duration', setDuration)}
+              renderDropdown(
+                'Estimated Usage',
+                duration,
+                getUsageOptions().filter(option => option !== duration),
+                'duration',
+                setDuration
+              )}
 
             {driverType === 'Monthly Driver' && (
               <>
-                {renderDropdown('Hours Per Day', hoursPerDay, ['8 Hours', '10 Hours', '12 Hours','1 Day'], 'hoursPerDay', setHoursPerDay)}
-                {renderDropdown('Days Per Week', daysPerWeek, ['5 Days', '6 Days'], 'daysPerWeek', setDaysPerWeek)}
+                {renderDropdown(
+                  'Hours Per Day',
+                  hoursPerDay,
+                  ['8 Hours', '10 Hours', '12 Hours', '1 Day'].filter(option => option !== hoursPerDay),
+                  'hoursPerDay',
+                  setHoursPerDay
+                )}
+                {renderDropdown(
+                  'Days Per Week',
+                  daysPerWeek,
+                  ['5 Days', '6 Days'].filter(option => option !== daysPerWeek),
+                  'daysPerWeek',
+                  setDaysPerWeek
+                )}
               </>
             )}
 
@@ -854,15 +997,35 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                 <View style={styles.dateTimeRow}>
                   <TouchableOpacity
                     style={styles.dateTimeBox}
-                    onPress={() => setShowDatePicker(true)}
+                    onPress={() => {
+                      setOpenDropdown(null);
+                      setShowDatePicker(true);
+                    }}
                   >
                     <Text style={styles.dateTimeText}>
-                      {date ? date.split('-').reverse().join('-') : 'dd-mm-yyyy'}
+                      {formatDateDisplay(date)}
                     </Text>
                   </TouchableOpacity>
-                  <View style={styles.dateTimeTimeContainer}>
-                    {renderDropdown('', time || 'Select time', getAvailableTimeSlots(), 'time', setTime)}
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.dateTimeBox, styles.timeBox]}
+                    onPress={() => {
+                      if (!date) {
+                        showAlert(
+                          'Select Date',
+                          'Please select the date first.',
+                          'warning'
+                        );
+                        return;
+                      }
+                      setOpenDropdown(null);
+                      setShowTimeModal(true);
+                    }}
+                  >
+                    <Text style={styles.dateTimeText}>
+                      {time || 'Select time'}
+                    </Text>
+                    <Text style={styles.timeArrow}>▼</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {showDatePicker && (
@@ -881,15 +1044,35 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
                     <View style={styles.dateTimeRow}>
                       <TouchableOpacity
                         style={styles.dateTimeBox}
-                        onPress={() => setShowReturnDatePicker(true)}
+                        onPress={() => {
+                          setOpenDropdown(null);
+                          setShowReturnDatePicker(true);
+                        }}
                       >
                         <Text style={styles.dateTimeText}>
-                          {returnDate ? returnDate.split('-').reverse().join('-') : 'dd-mm-yyyy'}
+                          {formatDateDisplay(returnDate)}
                         </Text>
                       </TouchableOpacity>
-                      <View style={styles.dateTimeTimeContainer}>
-                        {renderDropdown('', returnTime || 'Select time', getReturnTimeSlots(), 'returnTime', setReturnTime)}
-                      </View>
+                      <TouchableOpacity
+                        style={[styles.dateTimeBox, styles.timeBox]}
+                        onPress={() => {
+                          if (!returnDate) {
+                            showAlert(
+                              'Select Date',
+                              'Please select the return date first.',
+                              'warning'
+                            );
+                            return;
+                          }
+                          setOpenDropdown(null);
+                          setShowReturnTimeModal(true);
+                        }}
+                      >
+                        <Text style={styles.dateTimeText}>
+                          {returnTime || 'Select time'}
+                        </Text>
+                        <Text style={styles.timeArrow}>▼</Text>
+                      </TouchableOpacity>
                     </View>
 
                     {showReturnDatePicker && (
@@ -906,8 +1089,20 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
               </>
             )}
 
-            {driverType !== 'Monthly Driver' && renderDropdown('Car Type', carType, ['Manual', 'Automatic', 'Both'], 'car', setCarType)}
-            {renderDropdown('Vehicle Type', vehicleType, ['Hatchback', 'Sedan', 'SUV', 'MPV'], 'vehicle', setVehicleType)}
+            {driverType !== 'Monthly Driver' && renderDropdown(
+              'Car Type',
+              carType,
+              ['Manual', 'Automatic', 'Both'].filter(option => option !== carType),
+              'car',
+              setCarType
+            )}
+            {renderDropdown(
+              'Vehicle Type',
+              vehicleType,
+              ['Hatchback', 'Sedan', 'SUV', 'MPV'].filter(option => option !== vehicleType),
+              'vehicle',
+              setVehicleType
+            )}
 
             {/* ROUTE DISTANCE & TRAVEL TIME */}
             {driverType !== 'Monthly Driver' &&
@@ -1048,6 +1243,88 @@ const BookScreen = ({ onBookingSuccess }: { onBookingSuccess?: () => void }) => 
         </View>
       )}
 
+      {showTimeModal && (
+        <View style={styles.timeModalOverlay}>
+          <View style={styles.timeModalBox}>
+            <View style={styles.timeModalHeader}>
+              <Text style={styles.timeModalTitle}>Select Time</Text>
+              <TouchableOpacity onPress={() => setShowTimeModal(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={getAvailableTimeSlots()}
+              keyExtractor={(item) => `from-${item}`}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              style={styles.timeList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.timeItem,
+                    time === item && styles.timeItemSelected,
+                  ]}
+                  onPress={() => {
+                    setTime(item);
+                    setShowTimeModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.timeItemText,
+                      time === item && styles.timeItemTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      )}
+
+      {showReturnTimeModal && (
+        <View style={styles.timeModalOverlay}>
+          <View style={styles.timeModalBox}>
+            <View style={styles.timeModalHeader}>
+              <Text style={styles.timeModalTitle}>Select Return Time</Text>
+              <TouchableOpacity onPress={() => setShowReturnTimeModal(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={getReturnTimeSlots()}
+              keyExtractor={(item) => `return-${item}`}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              style={styles.timeList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.timeItem,
+                    returnTime === item && styles.timeItemSelected,
+                  ]}
+                  onPress={() => {
+                    setReturnTime(item);
+                    setShowReturnTimeModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.timeItemText,
+                      returnTime === item && styles.timeItemTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      )}
+
       <CustomAlert
         visible={alert.visible}
         title={alert.title}
@@ -1176,6 +1453,17 @@ const styles = StyleSheet.create({
     marginVertical: 10
   },
 
+  dropdownWrapper: {
+    position: 'relative',
+    marginBottom: 15,
+    zIndex: 1,
+  },
+
+  dropdownWrapperOpen: {
+    zIndex: 3000,
+    elevation: 3000,
+  },
+
   dropdownBox: {
     backgroundColor: '#eee',
     height: 58,
@@ -1186,15 +1474,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  dropdownList: { backgroundColor: '#fff', borderRadius: 10 },
+  dropdownValue: {
+    fontSize: 16,
+    color: '#222',
+  },
 
-  dropdownItem: { padding: 15 },
+  dropdownArrow: {
+    fontSize: 16,
+    color: '#000',
+  },
+
+  dropdownList: {
+    position: 'absolute',
+    top: 63,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    maxHeight: 220,
+    zIndex: 1000,
+    elevation: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+
+  dropdownListAbove: {
+    top: undefined,
+    bottom: 63,
+  },
+
+  dropdownScroll: {
+    maxHeight: 220,
+  },
+
+  dropdownItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+
+  selectedDropdownItem: {
+    backgroundColor: '#f0f0f0',
+  },
+
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#222',
+  },
+
+  noSlotsText: {
+    padding: 15,
+    color: '#999',
+  },
 
   dateTimeRow: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: 15,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  dateTimeRowOpen: {
+    zIndex: 2000,
+    elevation: 2000,
   },
   dateTimeBox: {
     flex: 1,
@@ -1204,9 +1550,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
   },
+  timeBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeArrow: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 5,
+  },
   dateTimeTimeContainer: {
     flex: 1,
-    height: 58,
+    zIndex: 1000,
+    elevation: 1000,
   },
   dateTimeText: {
     fontSize: 16,
@@ -1351,6 +1708,61 @@ const styles = StyleSheet.create({
   paymentBtn: { width: '100%', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
   paymentText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   cancelText: { color: '#999', fontSize: 16, fontWeight: 'bold' },
+  timeModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
+    elevation: 99999,
+  },
+  timeModalBox: {
+    width: '85%',
+    maxHeight: '75%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 20,
+  },
+  timeModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  timeModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
+  },
+  timeList: {
+    maxHeight: 500,
+  },
+  timeItem: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  timeItemSelected: {
+    backgroundColor: '#000',
+  },
+  timeItemText: {
+    fontSize: 16,
+    color: '#222',
+  },
+  timeItemTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
   mapContainer: {
     height: 250,
     width: '100%',

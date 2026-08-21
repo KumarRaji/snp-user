@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "snp-user",
-    "slug": "snp-user",
+    "name": "SNP Cabs",
+    "slug": "snp-cabs",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -25,7 +25,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.kumarrit82291.snpuser",
+      "package": "com.snp.cabs",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAfUP27GUuOL0cBm_ROdjE2n6EyVKesIu8"
